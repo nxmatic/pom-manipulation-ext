@@ -44,6 +44,9 @@ public class ModulesItem
     @JsonProperty( "gav" )
     private GAV gav = new GAV();
 
+    @JsonProperty( "pomFile" )
+    private String pomFile = "";
+
     /**
      * Represent a collection of properties, mapping to key to a {@link PropertiesItem} object
      * containing the new and old value

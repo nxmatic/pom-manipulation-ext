@@ -20,17 +20,22 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import javax.management.RuntimeErrorException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.reflect.FieldUtils;
@@ -57,6 +62,8 @@ import org.commonjava.maven.galley.maven.parse.PomPeek;
 import org.jdom2.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.vavr.CheckedFunction1;
 
 /**
  * Utility class used to read raw models for POMs, and rewrite any project POMs that were changed.
@@ -203,13 +210,46 @@ public class PomIO
     }
 
     /**
+     * For any project listed as changed (tracked by GA in the session), write the modified model out to disk
+     * in a temporary place and atttach it to the model.
+     * Uses {@link ModelETL} to preserve as much formatting as possible.
+     *
+     * @param changed the modified Projects to write out.
+     * @throws ManipulationException if an error occurs.
+     */
+    public void writeTemporaryPOMs( final Set<Project> changed )
+        throws ManipulationException
+    {
+        writePOMs( changed, project -> {
+            try {
+                return createManipulatedPOMFile( project.getPom() );
+            } catch (IOException cause) {
+                throw new RuntimeException("Unable to create temporary POM file", cause);
+            }
+        });
+    }
+
+    private File createManipulatedPOMFile(File source) throws IOException {
+        final Path targetPath = source.toPath().getParent()
+          .resolve("pom-manipulation-ext.xml");
+
+        return Files.copy(source.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING)
+          .toFile();
+    }
+    /**
      * For any project listed as changed (tracked by GA in the session), write the modified model out to disk.
      * Uses {@link ModelETL} to preserve as much formatting as possible.
      *
      * @param changed the modified Projects to write out.
      * @throws ManipulationException if an error occurs.
      */
-    public void rewritePOMs( final Set<Project> changed )
+    public void writePOMs( final Set<Project> changed )
+        throws ManipulationException
+    {
+        writePOMs( changed, project -> project.getPom());
+    }
+
+    protected void writePOMs( final Set<Project> changed, final Function<Project, File> outputFile )
         throws ManipulationException
     {
         manifestComment = "Modified by POM Manipulation Extension for Maven " +  ManifestUtils.getManifestInformation(PomIO.class);
@@ -221,24 +261,14 @@ public class PomIO
                 logger.debug( "{} modified! Rewriting.", project );
             }
 
-            File pom = project.getPom();
-
             final Model model = project.getModel();
+            final File pomFile = outputFile.apply(project);
 
-            logger.trace( "Rewriting: {} in place of: {}{}       to POM: {}", model.getId(), project.getKey(), System.lineSeparator(), pom );
+            logger.trace( "Rewriting: {} in place of: {}{}       to POM: {}", model.getId(), project.getKey(), System.lineSeparator(), pomFile );
 
-            write( project, pom, model );
+            write( project, pomFile, model );
 
-            // this happens with integration tests!
-            // This is a total hack, but the alternative seems to be adding complexity through a custom model processor.
-            if ( pom.getName()
-                            .equals( "interpolated-pom.xml" ) )
-            {
-                final File dir = pom.getParentFile();
-                pom = dir == null ? new File( "pom.xml" ) : new File( dir, "pom.xml" );
-
-                write( project, pom, model );
-            }
+            model.setPomFile( pomFile );
         }
     }
 

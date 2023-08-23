@@ -64,7 +64,7 @@ public final class Utils
 
     private static final DefaultJDOMFactory factory = new DefaultJDOMFactory();
 
-    private final Logger logger = LoggerFactory.getLogger( Utils.class );
+    private static final Logger logger = LoggerFactory.getLogger( Utils.class );
 
 
     /**
