@@ -17,6 +17,7 @@ package org.commonjava.maven.ext.core;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
+import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Settings;
 import org.commonjava.maven.ext.annotation.ConfigValue;
 import org.commonjava.maven.ext.common.ManipulationException;
@@ -27,7 +28,6 @@ import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.state.CommonState;
 import org.commonjava.maven.ext.core.state.State;
 import org.commonjava.maven.ext.core.state.VersioningState;
-
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -115,9 +116,39 @@ public class ManipulationSession
     @Override
     public Properties getUserProperties()
     {
-        return mavenSession == null ? new Properties() : mavenSession.getRequest()
-                                                                     .getUserProperties();
+         return userProperties;
     }
+
+    class UserProperties extends Properties {
+
+	    static final long serialVersionUID = 1L;
+
+		@Override
+		public String getProperty(String key) {
+			if (mavenSession == null) {
+				return null;
+			}
+			return Optional.ofNullable(userProperties().getProperty(key))
+					.orElse(activeProfilesProperties().getProperty(key));
+		}
+
+		Properties userProperties() {
+			return mavenSession.getRequest().getUserProperties();
+		}
+
+		Properties activeProfilesProperties() {
+            List<String> activeProfileIds = mavenSession.getSettings().getActiveProfiles();
+
+            return mavenSession.getSettings().getProfiles().stream()
+                .filter(profile -> activeProfileIds.contains(profile.getId()))
+                .map(Profile::getProperties)
+                .collect(Properties::new, (props1, props2) -> props1.putAll(props2), (props1, props2) -> {});
+		}
+	};
+	
+	final UserProperties userProperties = new UserProperties();
+
+
 
     public void setProjects( final List<Project> projects )
     {
@@ -247,4 +278,6 @@ public class ManipulationSession
     {
         return mavenSession;
     }
+
+  
 }
