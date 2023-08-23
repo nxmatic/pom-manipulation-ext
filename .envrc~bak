@@ -1,0 +1,17 @@
+
+:github:repo:() {
+  local remoteUrl=$(git config --get remote.origin.url)
+  local githubRepo=${remoteUrl##*/}
+  local githubOwner=${remoteUrl%/*}
+
+  echo ${githubOwner##*:}/${githubRepo%.git}
+}
+
+
+set -ax
+
+GITHUB_REPOSITORY=$( :github:repo: )
+GITHUB_OWNER=${GITHUB_REPOSITORY%/*}
+
+set +ax
+		     

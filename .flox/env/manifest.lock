@@ -1,0 +1,145 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "version": 1,
+    "install": {
+      "temurin-bin": {
+        "pkg-path": "temurin-bin"
+      }
+    },
+    "hook": {},
+    "profile": {
+      "common": "  # FLOX_RCPATH=/Volumes/GitHub/nxmatic/nix-darwin-home/modules/home-manager/flox.rc\n\n  : rc loading\n  source $FLOX_RCPATH\n\n  # flox:env:debug\n  flox:env:maven\n"
+    },
+    "options": {
+      "systems": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "allow": {
+        "licenses": []
+      },
+      "semver": {}
+    }
+  },
+  "packages": [
+    {
+      "attr_path": "temurin-bin",
+      "broken": false,
+      "derivation": "/nix/store/ygfm7ln2547g9h0n328xp68125nrz06x-temurin-bin-21.0.4.drv",
+      "description": "Eclipse Temurin, prebuilt OpenJDK binary",
+      "install_id": "temurin-bin",
+      "license": "GPL-2.0-with-classpath-exception",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "name": "temurin-bin-21.0.4",
+      "pname": "temurin-bin",
+      "rev": "970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "rev_count": 713897,
+      "rev_date": "2024-11-28T23:45:21Z",
+      "scrape_date": "2024-12-01T03:54:50Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7rivpy781vam9j1crcx6gz1i246qkhc1-temurin-bin-21.0.4"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "temurin-bin",
+      "broken": false,
+      "derivation": "/nix/store/bqh9396w7ajvxzfagsvg9lnk8v2kh7pm-temurin-bin-21.0.4.drv",
+      "description": "Eclipse Temurin, prebuilt OpenJDK binary",
+      "install_id": "temurin-bin",
+      "license": "GPL-2.0-with-classpath-exception",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "name": "temurin-bin-21.0.4",
+      "pname": "temurin-bin",
+      "rev": "970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "rev_count": 713897,
+      "rev_date": "2024-11-28T23:45:21Z",
+      "scrape_date": "2024-12-01T03:54:50Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/0laqk367db24z561krkfy1arzq3948zg-temurin-bin-21.0.4"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "temurin-bin",
+      "broken": false,
+      "derivation": "/nix/store/4c1qx0kfv8ywn8z9kpqsp057hv6b0awd-temurin-bin-21.0.4.drv",
+      "description": "Eclipse Temurin, prebuilt OpenJDK binary",
+      "install_id": "temurin-bin",
+      "license": "GPL-2.0-with-classpath-exception",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "name": "temurin-bin-21.0.4",
+      "pname": "temurin-bin",
+      "rev": "970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "rev_count": 713897,
+      "rev_date": "2024-11-28T23:45:21Z",
+      "scrape_date": "2024-12-01T03:54:50Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/a6wpl31f1zr20jr8zg0la94mrsq5d6qf-temurin-bin-21.0.4"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "temurin-bin",
+      "broken": false,
+      "derivation": "/nix/store/wsyiikgzabxvmc6pd2msz1gndxbg5kh0-temurin-bin-21.0.4.drv",
+      "description": "Eclipse Temurin, prebuilt OpenJDK binary",
+      "install_id": "temurin-bin",
+      "license": "GPL-2.0-with-classpath-exception",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "name": "temurin-bin-21.0.4",
+      "pname": "temurin-bin",
+      "rev": "970e93b9f82e2a0f3675757eb0bfc73297cc6370",
+      "rev_count": 713897,
+      "rev_date": "2024-11-28T23:45:21Z",
+      "scrape_date": "2024-12-01T03:54:50Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/hb8bmpwf68kwdrrbmq0yzc164gfdx1kq-temurin-bin-21.0.4"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}

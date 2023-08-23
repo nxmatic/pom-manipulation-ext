@@ -27,6 +27,8 @@
 
   <artifactId>pom-manipulation-ext</artifactId>
 
+  <packaging>maven-plugin</packaging>
+
   <name>POM Manipulation for Maven Extension</name>
 
   <dependencies>
