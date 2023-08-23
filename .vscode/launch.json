@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Attach to Remote Program",
+            "request": "attach",
+            "projectName": "pom-manipulation-ext",
+            "hostName": "localhost",
+            "port": "8000"
+        },
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "Cli",
+            "request": "launch",
+            "mainClass": "org.commonjava.maven.ext.cli.Cli",
+            "projectName": "pom-manipulation-cli"
+        },
+        {
+            "type": "java",
+            "name": "MockServer",
+            "request": "launch",
+            "mainClass": "org.commonjava.maven.ext.io.rest.rule.MockServer",
+            "projectName": "pom-manipulation-io"
+        }
+    ]
+}

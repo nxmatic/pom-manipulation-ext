@@ -77,7 +77,8 @@
     <javaTestVersion>${javaVersion}</javaTestVersion>
     <addJarIndex>false</addJarIndex>
 
-    <mavenVersion>3.6.3</mavenVersion>
+    <mavenVersion>3.9.3</mavenVersion>
+    <mavenVersionAnnotations>3.9.0</mavenVersionAnnotations>
     <atlasVersion>0.17.2</atlasVersion>
     <daVersion>2.1.0</daVersion>
     <galleyVersion>0.16.6</galleyVersion>
@@ -105,60 +106,60 @@
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-annotation</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-common</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-cli</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-cli</artifactId>
         <classifier>minimal</classifier>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-core</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-core</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-ext</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-io</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-io</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-integration-test</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.commonjava.maven.ext</groupId>
         <artifactId>pom-manipulation-integration-test</artifactId>
-        <version>4.17-SNAPSHOT</version>
+        <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
 
@@ -721,6 +722,29 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
+	<!-- should go in a dedicated pom and injected by configuration  -->
+	<executions>
+          <execution>
+            <id>enforce-best-practices</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <fail>true</fail>
+              <rules>
+                <reactorModuleConvergence />
+                <requireNoRepositories />
+                <requirePluginVersions>
+                  <banLatest />
+                  <banRelease />
+                  <banSnapshots />
+                  <unCheckedPluginList>org.eclipse.m2e:lifecycle-mapping</unCheckedPluginList>
+                </requirePluginVersions>
+              </rules>
+            </configuration>
+	  </execution>
+	</executions>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -782,6 +806,7 @@
     </plugins>
   </reporting>
 
+
   <modules>
     <module>annotation</module>
     <module>common</module>
@@ -803,6 +828,57 @@
         <!-- Security manager under JDK18 causes issues: https://github.com/stefanbirkner/system-rules/issues/85 -->
         <surefireSucurityManager>-Djava.security.manager=allow</surefireSucurityManager>
       </properties>
+    </profile>
+    <!-- should go in a dedicated pom and injected by manipulation  -->
+    <profile>
+      <id>redhat-ga</id>
+      <activation>
+	<activeByDefault>true</activeByDefault>
+      </activation>
+      <build>
+	<plugins>
+	  <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+	    <executions>
+              <execution>
+		<id>enforce-best-practices</id>
+		<phase>initialize</phase>
+		<goals>
+		  <goal>enforce</goal>
+		</goals>
+		<configuration>
+		  <fail>false</fail>
+		  <rules>
+                    <reactorModuleConvergence />
+                    <requireNoRepositories />
+                    <requirePluginVersions>
+                      <banLatest />
+                      <banRelease />
+                      <banSnapshots />
+                      <unCheckedPluginList>org.eclipse.m2e:lifecycle-mapping</unCheckedPluginList>
+                    </requirePluginVersions>
+		  </rules>
+		</configuration>
+	      </execution>
+	    </executions>
+	  </plugin>
+	</plugins>
+      </build>
+      <repositories>
+	<repository>
+	  <id>redhat-ga</id>
+	  <url>https://maven.repository.redhat.com/ga/</url>
+	  <releases>
+              <enabled>true</enabled>
+              <checksumPolicy>fail</checksumPolicy>
+              <updatePolicy>never</updatePolicy>
+	  </releases>
+	  <snapshots>
+            <enabled>false</enabled>
+	  </snapshots>
+	</repository>
+      </repositories>
     </profile>
   </profiles>
 </project>
