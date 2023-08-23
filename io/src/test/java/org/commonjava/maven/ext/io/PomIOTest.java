@@ -75,7 +75,7 @@ public class PomIOTest
         // We don't want this to be the execution root so that it doesn't add "Modified by" which breaks the comparison
         FieldUtils.writeDeclaredField( projects.get( 0 ), "executionRoot", false, true);
         HashSet<Project> changed = new HashSet<>(projects);
-        pomIO.rewritePOMs( changed );
+        pomIO.writeTemporaryPOMs( changed );
 
         assertTrue( FileUtils.contentEqualsIgnoreEOL( pom, targetFile, StandardCharsets.UTF_8.toString() ) );
         assertTrue( FileUtils.contentEquals( targetFile, pom ) );
@@ -106,7 +106,7 @@ public class PomIOTest
         Project p = new Project( targetFile, model );
         HashSet<Project> changed = new HashSet<>();
         changed.add( p );
-        pomIO.rewritePOMs( changed );
+        pomIO.writeTemporaryPOMs( changed );
 
         assertTrue( FileUtils.contentEqualsIgnoreEOL( pom, targetFile, StandardCharsets.UTF_8.toString() ) );
         assertTrue( FileUtils.contentEquals( targetFile, pom ) );
@@ -131,7 +131,7 @@ public class PomIOTest
         HashSet<Project> changed = new HashSet<>();
         changed.add( p );
 
-        pomIO.rewritePOMs( changed );
+        pomIO.writeTemporaryPOMs( changed );
 
         p = pomIO.parseProject( targetFile ).get( 0 );
 
@@ -188,12 +188,12 @@ public class PomIOTest
 
         HashSet<Project> changed = new HashSet<>();
         changed.add( project );
-        pomIO.rewritePOMs( changed );
+        pomIO.writeTemporaryPOMs( changed );
 
         String s = FileUtils.readFileToString( targetFile, StandardCharsets.UTF_8 );
         assertEquals( 1, StringUtils.countMatches(s, "Modified by POM Manipulation Extension" ) );
 
-        pomIO.rewritePOMs( changed );
+        pomIO.writeTemporaryPOMs( changed );
         s = FileUtils.readFileToString( targetFile, StandardCharsets.UTF_8 );
         assertEquals( 1, StringUtils.countMatches(s, "Modified by POM Manipulation Extension" ) );
     }

@@ -136,6 +136,12 @@ public class ProjectComparator
                             }
                             injectSpacerLine(builder);
 
+                            if ( ! originalProject.getPom().getPath().equals( newProject.getModel().getPomFile().getPath() ) )
+                            {
+                                module.setPomFile( newProject.getModel().getPomFile().getPath() );
+                                append( builder, "\tPOM file: {} -> {}", originalProject.getPom().getPath(), newProject.getModel().getPomFile().getPath() );
+                            }
+                            injectSpacerLine( builder );
 
                             newProject.getModel().getProperties().forEach( ( nKey, nValue ) ->
                                 originalProject.getModel().getProperties().forEach( ( oKey, oValue ) -> {

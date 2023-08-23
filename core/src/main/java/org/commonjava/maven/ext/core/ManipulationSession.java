@@ -27,7 +27,6 @@ import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.state.CommonState;
 import org.commonjava.maven.ext.core.state.State;
 import org.commonjava.maven.ext.core.state.VersioningState;
-
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
@@ -247,4 +246,6 @@ public class ManipulationSession
     {
         return mavenSession;
     }
+
+  
 }
