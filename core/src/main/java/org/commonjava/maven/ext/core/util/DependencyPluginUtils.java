@@ -58,7 +58,7 @@ import static org.apache.commons.lang.StringUtils.countMatches;
 @UtilityClass
 public final class DependencyPluginUtils
 {
-    private final Logger logger = LoggerFactory.getLogger( DependencyPluginUtils.class );
+    private final static Logger logger = LoggerFactory.getLogger( DependencyPluginUtils.class );
 
     /**
      * This handles updating a value (be it from a Dependency or Plugin) e.g. {@code artifactId} to its new value taking into
