@@ -89,7 +89,7 @@
     <jsonPathVersion>2.8.0</jsonPathVersion>
     <slf4jVersion>1.7.36</slf4jVersion>
     <docletVersion>1.1</docletVersion>
-    <lombokVersion>1.18.26</lombokVersion>
+    <lombokVersion>1.18.30</lombokVersion>
     <lombokPluginVersion>1.18.20.0</lombokPluginVersion>
     <shadePluginVersion>3.2.4</shadePluginVersion>
 
@@ -650,6 +650,13 @@
           <groupId>org.projectlombok</groupId>
           <artifactId>lombok-maven-plugin</artifactId>
           <version>${lombokPluginVersion}</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>${lombokVersion}</version>
+            </dependency>
+          </dependencies>
         </plugin>
 	<plugin>
           <artifactId>maven-compiler-plugin</artifactId>
