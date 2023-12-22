@@ -53,6 +53,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
@@ -541,8 +542,10 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             else if ( localPluginType == PluginType.LocalPM && commonState.isOverrideTransitive() && ( override.getConfiguration() != null
                             || override.getExecutions().size() > 0 ) )
             {
-                project.getModel().getBuild().getPluginManagement().getPlugins().add( override );
-                logger.info( "Added plugin version: {}={}", override.getKey(), newValue );
+                Optional.ofNullable(project.getModel().getBuild()).ifPresent(build -> {
+                    build.getPluginManagement().getPlugins().add(override);
+                    logger.info("Added plugin version: {}={}", override.getKey(), newValue);
+                });
             }
         }
     }
