@@ -38,6 +38,7 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
+import groovyjarjarasm.asm.Opcodes;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ConstructorNode;
 import org.codehaus.groovy.ast.ImportNode;
@@ -242,7 +243,7 @@ public class ASTTransformer  extends AbstractASTTransformation {
             // The reason is that our transform is getting called more than once sometimes.
             if (defaultMethod != null) {
                 cNode.removeMethod(defaultMethod);
-                MethodNode methodNode = new MethodNode(runScriptMethod.getName(), runScriptMethod.getModifiers() & ~ACC_ABSTRACT
+                MethodNode methodNode = new MethodNode(runScriptMethod.getName(), runScriptMethod.getModifiers() & ~Opcodes.ACC_ABSTRACT
                                 , runScriptMethod.getReturnType(), runScriptMethod.getParameters(), runScriptMethod.getExceptions()
                                 , defaultMethod.getCode());
                 // The AST node metadata has the flag that indicates that this method is a script body.

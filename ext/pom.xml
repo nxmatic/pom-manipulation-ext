@@ -201,15 +201,15 @@
       <artifactId>commons-logging</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.groovy</groupId>
+      <groupId>org.apache.groovy</groupId>
       <artifactId>groovy</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.groovy</groupId>
+      <groupId>org.apache.groovy</groupId>
       <artifactId>groovy-json</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.groovy</groupId>
+      <groupId>org.apache.groovy</groupId>
       <artifactId>groovy-xml</artifactId>
     </dependency>
     <dependency>
@@ -271,9 +271,9 @@
                   <include>org.apache.httpcomponents:*</include>
                   <include>org.apache.ivy:*</include>
                   <include>org.apache.maven.release:*</include>
-                  <include>org.codehaus.groovy:groovy-json</include>
-                  <include>org.codehaus.groovy:groovy-xml</include>
-                  <include>org.codehaus.groovy:groovy</include>
+                  <include>org.apache.groovy:groovy-json</include>
+                  <include>org.apache.groovy:groovy-xml</include>
+                  <include>org.apache.groovy:groovy</include>
                   <include>org.jboss.da:reports-model</include>
                   <include>org.jdom:jdom2</include>
                   <include>org.ow2.asm:asm</include>

@@ -78,13 +78,13 @@ x<?xml version="1.0"?>
     <javaTestVersion>${javaVersion}</javaTestVersion>
     <addJarIndex>false</addJarIndex>
 
-    <mavenVersion>3.9.4</mavenVersion>
+    <mavenVersion>3.9.6</mavenVersion>
     <mavenVersionAnnotations>3.9.0</mavenVersionAnnotations>
     <atlasVersion>0.17.2</atlasVersion>
     <daVersion>2.1.0</daVersion>
     <galleyVersion>0.16.6</galleyVersion>
 
-    <groovyVersion>3.0.17</groovyVersion>
+    <groovyVersion>4.0.16</groovyVersion>
     <unirestVersion>3.14.2</unirestVersion>
     <jsonPathVersion>2.9.0</jsonPathVersion>
     <slf4jVersion>2.0.9</slf4jVersion>
@@ -442,17 +442,17 @@ x<?xml version="1.0"?>
       </dependency>
 
       <dependency>
-        <groupId>org.codehaus.groovy</groupId>
+        <groupId>org.apache.groovy</groupId>
         <artifactId>groovy</artifactId>
         <version>${groovyVersion}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.groovy</groupId>
+        <groupId>org.apache.groovy</groupId>
         <artifactId>groovy-json</artifactId>
         <version>${groovyVersion}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.groovy</groupId>
+        <groupId>org.apache.groovy</groupId>
         <artifactId>groovy-xml</artifactId>
         <version>${groovyVersion}</version>
       </dependency>
@@ -658,10 +658,18 @@ x<?xml version="1.0"?>
               <version>${lombokVersion}</version>
             </dependency>
           </dependencies>
+          <configuration>
+              <outputDirectory>${project.build.directory}/javadoc-generated-sources</outputDirectory>
+              <addOutputDirectory>false</addOutputDirectory>
+              <sourceDirectory>src/main/java</sourceDirectory>
+              <formatPreferences>
+                <javaLangAsFQN>skip</javaLangAsFQN>
+              </formatPreferences>
+           </configuration>
         </plugin>
-	<plugin>
+	    <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>3.11.0</version>
           <configuration>
             <showWarnings>true</showWarnings>
             <debug>true</debug>
@@ -685,7 +693,6 @@ x<?xml version="1.0"?>
       <plugin>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok-maven-plugin</artifactId>
-        <version>${lombokPluginVersion}</version>
         <executions>
           <execution>
             <id>delombok</id>
@@ -693,14 +700,7 @@ x<?xml version="1.0"?>
             <goals>
               <goal>delombok</goal>
             </goals>
-            <configuration>
-              <outputDirectory>${project.build.directory}/javadoc-generated-sources</outputDirectory>
-              <addOutputDirectory>false</addOutputDirectory>
-              <sourceDirectory>src/main/java</sourceDirectory>
-              <formatPreferences>
-                <javaLangAsFQN>skip</javaLangAsFQN>
-              </formatPreferences>
-            </configuration>
+
           </execution>
         </executions>
       </plugin>
@@ -750,7 +750,7 @@ x<?xml version="1.0"?>
 
                 <link>https://www.javadoc.io/doc/org.slf4j/slf4j-api/${slf4jVersion}</link>
                 <link>https://www.javadoc.io/doc/com.jayway.jsonpath/json-path/${jsonPathVersion}</link>
-                <link>https://www.javadoc.io/doc/org.codehaus.groovy/groovy-all/${groovyVersion}</link>
+                <link>https://www.javadoc.io/doc/org.apache.groovy/groovy-all/${groovyVersion}</link>
                 <link>https://fasterxml.github.io/jackson-core/javadoc/${jacksonJavadocVersion}</link>
               </links>
               <additionalJOptions>
