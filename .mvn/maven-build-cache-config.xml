@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- see doc https://maven.apache.org/extensions/maven-build-cache-extension/build-cache-config.html#class_include /-->
+
+<cache xmlns="http://maven.apache.org/BUILD-CACHE-CONFIG/1.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/BUILD-CACHE-CONFIG/1.0.0 http://maven.apache.org/xsd/cache-config-1.0.0.xsd">
+  <configuration>
+    <enabled>true</enabled>
+    <hashAlgorithm>SHA-256</hashAlgorithm>
+    <projectVersioning adjustMetaInf="true"/>
+    <validateXml>true</validateXml>
+  </configuration>
+  
+  <input>
+    <global>
+      <excludes>
+        <exclude>node_modules</exclude>
+      </excludes>
+    </global>
+    <plugins>
+      <plugin artifactId="jgitver-maven-plugin">
+        <dirScan mode="skip"/>
+      </plugin>
+      <plugin artifactId="maven-surefire-plugin">
+        <effectivePom>
+          <excludeProperties>
+            <excludeProperty>argLine</excludeProperty>
+            <excludeProperty>skipTests</excludeProperty>
+          </excludeProperties>
+        </effectivePom>
+      </plugin>
+      <plugin artifactId="maven-failsafe-plugin">
+        <effectivePom>
+          <excludeProperties>
+            <excludeProperty>argLine</excludeProperty>
+            <excludeProperty>skipTests</excludeProperty>
+            <excludeProperty>skipITs</excludeProperty>
+          </excludeProperties>
+        </effectivePom>
+      </plugin>
+      <plugin artifactId="frontend-maven-plugin">
+        <effectivePom>
+          <excludeProperties>
+            <excludeProperty>PROJECT_VERSION</excludeProperty>
+          </excludeProperties>
+        </effectivePom>
+        <dirScan>
+          <includes>
+            <include tagName='workingDirectory' recursive='true'/>
+          </includes>
+        </dirScan>
+      </plugin>
+      <plugin artifactId="maven-clean-plugin">
+	<dirScan mode="skip"/>
+      </plugin>
+    </plugins>
+  </input>
+  <executionControl>
+    <runAlways>
+      <goalsLists>
+        <goalsList artifactId="maven-toolchains-plugin">
+          <goals>
+            <goal>toolchain</goal>
+          </goals>
+        </goalsList>
+        <goalsList artifactId="maven-surefire-plugin">
+          <goals>
+            <goal>test</goal>
+          </goals>
+        </goalsList>
+        <goalsList artifactId="maven-failsafe-plugin">
+          <goals>
+            <goal>integration-test</goal>
+            <goal>verify</goal>
+          </goals>
+        </goalsList>
+	<goalsList artifactId="jgitver-maven-plugin">
+          <goals>
+            <goal>attach-modified-poms</goal>
+          </goals>
+        </goalsList>
+	<goalsList artifactId="pom-manipulation-ext">
+          <goals>
+            <goal>attach-modified-poms</goal>
+          </goals>
+        </goalsList>
+	<goalsList artifactId="maven-install-plugin">
+          <goals>
+            <goal>install</goal>
+          </goals>
+        </goalsList>
+      </goalsLists>
+    </runAlways>
+  </executionControl>
+</cache>

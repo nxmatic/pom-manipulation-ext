@@ -1,0 +1,40 @@
+<extensions xmlns="http://maven.apache.org/EXTENSIONS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.0.0 http://maven.apache.org/xsd/core-extensions-1.0.0.xsd">
+  <extension>
+    <groupId>com.github.sviperll</groupId>
+    <artifactId>maven-profiledep-extension</artifactId>
+    <version>0.24-beta2</version>
+  </extension>
+  <extension>
+    <groupId>org.apache.maven.extensions</groupId>
+    <artifactId>maven-build-cache-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+  <extension>
+    <groupId>noname.maven.extensions.devenv</groupId>
+    <artifactId>maven-devenv-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+  <extension>
+    <groupId>org.apache.maven.extensions</groupId>
+    <artifactId>maven-external-version-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+<!--
+  <extension>
+    <groupId>org.commonjava.maven.ext</groupId>
+    <artifactId>pom-manipulation-ext</artifactId>
+    <version>4.19</version>
+  </extension>
+  <extension>
+    <groupId>noname.maven.extensions.devenv</groupId>
+    <artifactId>maven-devenv-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+  <extension>
+    <groupId>org.apache.maven.extensions</groupId>
+    <artifactId>maven-build-cache-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+-->
+    <!--version>0.0.0-dev</version-->
+</extensions>
