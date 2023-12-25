@@ -98,7 +98,28 @@ public class ModelIO
             throw new ManipulationException( "Failed to resolve POM: {}", ref.asPomArtifact() );
         }
 
-        try (InputStream in = transfer.openInputStream())
+        class LoggingInputStream extends InputStream {
+            final InputStream delegate;
+
+            public LoggingInputStream(InputStream delegate) {
+                this.delegate = delegate;
+            }
+
+            @Override
+            public int read() throws IOException {
+                return delegate.read();
+            }
+
+            // Override other methods as needed, delegating to the original stream
+
+            @Override
+            public void close() throws IOException {
+                logger.debug("Closing transfer stream", new Throwable("call stack"));
+                delegate.close();
+            }
+        };
+        
+        try (InputStream in = new LoggingInputStream(transfer.openInputStream()))
         {
             return new MavenXpp3Reader().read( in );
         }

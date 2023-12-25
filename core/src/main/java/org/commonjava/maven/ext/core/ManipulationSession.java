@@ -15,12 +15,26 @@
  */
 package org.commonjava.maven.ext.core;
 
+import java.io.File;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Properties;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Settings;
 import org.commonjava.maven.ext.annotation.ConfigValue;
 import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.session.MavenSessionHandler;
 import org.commonjava.maven.ext.common.util.ManifestUtils;
@@ -28,16 +42,6 @@ import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.state.CommonState;
 import org.commonjava.maven.ext.core.state.State;
 import org.commonjava.maven.ext.core.state.VersioningState;
-import javax.inject.Named;
-import javax.inject.Singleton;
-import java.io.File;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Map.Entry;
-import java.util.Properties;
 
 /**
  * Repository for components that help manipulate POMs as needed, and state related to each {@link Manipulator}
@@ -56,7 +60,12 @@ public class ManipulationSession
 
     private final Map<Class<?>, State> states = new HashMap<>();
 
+    @Inject
+    private ManipulatingExtensionBridge mavenBridge;
+    
     private MavenSession mavenSession;
+    
+    private Optional<PME> previousReport;
 
     /**
      * List of <code>Project</code> instances.
@@ -111,6 +120,7 @@ public class ManipulationSession
     public void setMavenSession( final MavenSession mavenSession )
     {
         this.mavenSession = mavenSession;
+        this.previousReport = mavenBridge.readReport(mavenSession);
     }
 
     @Override
@@ -279,5 +289,12 @@ public class ManipulationSession
         return mavenSession;
     }
 
+    /**
+     * 
+     * @return the previous manipulation report if anyx
+     */
+    Optional<PME> getPreviousReport() {
+        return previousReport;
+    }
   
 }

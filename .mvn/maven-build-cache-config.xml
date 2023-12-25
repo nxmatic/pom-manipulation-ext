@@ -74,21 +74,6 @@
             <goal>verify</goal>
           </goals>
         </goalsList>
-	<goalsList artifactId="jgitver-maven-plugin">
-          <goals>
-            <goal>attach-modified-poms</goal>
-          </goals>
-        </goalsList>
-	<goalsList artifactId="pom-manipulation-ext">
-          <goals>
-            <goal>attach-modified-poms</goal>
-          </goals>
-        </goalsList>
-	<goalsList artifactId="maven-install-plugin">
-          <goals>
-            <goal>install</goal>
-          </goals>
-        </goalsList>
       </goalsLists>
     </runAlways>
   </executionControl>

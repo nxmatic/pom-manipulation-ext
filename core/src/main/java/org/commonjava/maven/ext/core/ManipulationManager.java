@@ -107,17 +107,22 @@ public class ManipulationManager {
 
     private final PomIO pomIO;
 
+    private final ManipulatingExtensionBridge mavenBridge;
+
     private final PreparseGroovyManipulator preparseGroovyManipulator;
 
     private final PME jsonReport = new PME();
 
     @Inject
     public ManipulationManager(Map<String, Manipulator> manipulators,
-            Map<String, ExtensionInfrastructure> infrastructure, PomIO pomIO,
+            Map<String, ExtensionInfrastructure> infrastructure, 
+            PomIO pomIO,
+            ManipulatingExtensionBridge mavenBridge,
             PreparseGroovyManipulator preparseGroovyManipulator) {
         this.manipulators = manipulators;
         this.infrastructure = infrastructure;
         this.pomIO = pomIO;
+        this.mavenBridge = mavenBridge;
         this.preparseGroovyManipulator = preparseGroovyManipulator;
     }
 
@@ -217,7 +222,9 @@ public class ManipulationManager {
                     session.getPom());
         }
 
-        final List<Project> currentProjects = pomIO.parseProject(session.getPom());
+        final List<Project> currentProjects = pomIO.parseProject( session.getPom());
+        // recover original from previous manipulation stage
+        session.getPreviousReport().ifPresent(report -> currentProjects.stream().forEach(project -> project.getKey()));
         final List<Project> originalProjects = new ArrayList<>();
         currentProjects.forEach(p -> originalProjects.add(new Project(p)));
 
@@ -238,12 +245,11 @@ public class ManipulationManager {
                     .orElseGet(() -> {
                         return currentProjects.stream().filter(Project::isExecutionRoot).findFirst().get();
                     });
-            AttachManipulatedPOMsMavenBridge bridge = new AttachManipulatedPOMsMavenBridge( session.getSession() );
 
             if ( ! Boolean.parseBoolean( session.getUserProperties().getProperty( REWRITE_CHANGED, "true" ) ) )
             {
-                bridge.addMojo(newExecutionRoot.getModel());
                 pomIO.writeTemporaryPOMs( changed );
+                mavenBridge.addMojo(newExecutionRoot.getModel());
             } else {
                 logger.debug( "Maven-Manipulation-Extension: Rewrite changed");
                 pomIO.writePOMs( changed );
@@ -256,15 +262,16 @@ public class ManipulationManager {
             }
             
             jsonReport.getGav().setPVR(newExecutionRoot.getKey());
-            jsonReport.getGav().setOriginalGAV(originalExecutionRoot.getKey().toString());
+            jsonReport.getGav()
+                      .setOriginalGAV(session.getPreviousReport()
+                                             .map(report -> report.getGav().getOriginalGAV())
+                                             .orElseGet(() -> originalExecutionRoot.getKey().toString()));
 
             WildcardMap<ProjectVersionRef> map = (session.getState(RelocationState.class) == null ? new WildcardMap<>()
                     : session.getState(RelocationState.class).getDependencyRelocations());
             String report = ProjectComparator.compareProjects(session, jsonReport, map, originalProjects,
                     currentProjects);
             logger.info("{}{}", System.lineSeparator(), report);
-
-            bridge.addReport(newExecutionRoot.getModel(), jsonReport);
 
             final String reportTxtOutputFile = session.getUserProperties().getProperty(REPORT_TXT_OUTPUT_FILE, "");
 
@@ -284,6 +291,10 @@ public class ManipulationManager {
             } catch (IOException e) {
                 logger.error("Unable to create result file", e);
                 throw new ManipulationException("Marker/result file creation failed", e);
+            }
+            
+            if ( ! Boolean.parseBoolean( session.getUserProperties().getProperty( REWRITE_CHANGED, "true" ) ) ) {
+                mavenBridge.addReport(session.getSession(), newExecutionRoot.getModel(), jsonReport);
             }
         }
 

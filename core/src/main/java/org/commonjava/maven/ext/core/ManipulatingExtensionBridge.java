@@ -22,6 +22,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
 import org.apache.maven.model.Dependency;
@@ -35,29 +38,33 @@ import org.commonjava.maven.ext.common.util.JSONUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AttachManipulatedPOMsMavenBridge {
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+/**
+ * This class is responsible for reporting the manipulated Maven project's POM file and ensuring it is attached to the project's artifact.
+ * It sets the manipulated POM as the source and injects a JSON report, which includes the new POM file paths,
+ * into the user properties for later retrieval by the MOJO.
+ */
+@Named
+@Singleton
+public class ManipulatingExtensionBridge {
 
     public static final String GOAL_ATTACH_MODIFIED_POMS = "attach-manipulated-poms";
     public static final String EXTENSION_ARTIFACT_ID = "pom-manipulation-ext";
     public static final String EXTENSION_GROUP_ID = "org.commonjava.maven.ext";
-    protected final MavenSession session;
 
     protected final Logger logger = LoggerFactory.getLogger( getClass() );
 
-    public AttachManipulatedPOMsMavenBridge(MavenSession session) {
-        this.session = session;
-    }
-
     /**
-     * Inject the JSON report including the new POM file paths
-     * in maven user properties for later
-     * retreive by the MOJO.
+     * Set the manipulate POM as source and inject the JSON report including the new POM file paths
+     * in the user properties for later
+     * retrieve by the MOJO.
      * 
      * @param model
      * @param report
      * @throws ManipulationException 
      */
-    public void addReport(final Model model, PME report) throws ManipulationException {
+    public void addReport(MavenSession session, Model model, PME report) throws ManipulationException {
         session.getRequest().setPom(model.getPomFile());
         try {
             session.getUserProperties().put(ManipulationManager.REPORT_USER_PROPERTY_KEY, JSONUtils.jsonToString(report));
@@ -67,16 +74,26 @@ public class AttachManipulatedPOMsMavenBridge {
     }
 
     /**
-     * Inject the json report in maven user properties and
-     * configure dynammically the MOJO in the project
-     *  for attaching the POM files in project builds.
+     * Read back the saved report in user properties.
+     * 
+     * @param mavenSession the running session
+     */
+    public Optional<PME> readReport(MavenSession mavenSession) {
+        final JSONUtils.InternalObjectMapper reportMapper = new JSONUtils.InternalObjectMapper(new ObjectMapper());
+
+        return Optional.ofNullable(mavenSession.getUserProperties()
+                .getProperty(ManipulationManager.REPORT_USER_PROPERTY_KEY))
+                .map(body -> reportMapper.readValue(body, PME.class));
+    }
+    
+    /**
+     * Inject the JSON report in maven user properties and
+     * configure dynamically the MOJO in the project
+     * for attaching the POM files in project builds.
      * 
      * @param rootModel
      */
     public void addMojo(final Model rootModel ) {
-        if (true) {
-            return;
-        }
         ensureBuildWithPluginsExistInModel(rootModel);
 
         Optional<Plugin> pluginOptional = rootModel.getBuild().getPlugins().stream()

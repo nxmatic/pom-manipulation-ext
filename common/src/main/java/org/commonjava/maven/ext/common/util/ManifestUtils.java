@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.security.CodeSource;
+import java.util.jar.Attributes;
 import java.util.jar.JarInputStream;
 import java.util.jar.Manifest;
 
@@ -72,8 +73,11 @@ public class ManifestUtils
                         final Manifest manifest = jarStream.getManifest();
                         if (manifest != null)
                         {
-                            result = manifest.getMainAttributes().getValue( "Implementation-Version" );
-                            result += " ( SHA: " + manifest.getMainAttributes().getValue( "Scm-Revision" ) + " )";
+                            Attributes mainAttributes = manifest.getMainAttributes();
+                            return String.format("%s (VERSION: %s, SHA: %s)",
+                                    mainAttributes.getValue("Implementation-Title"),
+                                    mainAttributes.getValue("Implementation-Version"),
+                                    mainAttributes.getValue("Scm-Revision"));
                         }
                     }
                 }

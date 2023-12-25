@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -46,57 +45,48 @@ import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectVersionRef;
 import org.commonjava.maven.ext.common.json.GAV;
 import org.commonjava.maven.ext.common.json.PME;
-import org.commonjava.maven.ext.common.util.JSONUtils;
-import org.commonjava.maven.ext.core.AttachManipulatedPOMsMavenBridge;
+import org.commonjava.maven.ext.core.ManipulatingExtensionBridge;
 import org.commonjava.maven.ext.core.ManipulationManager;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /** Works in conjunction with ManipulatingLifeCycleParticipant. */
-@Mojo(name = AttachManipulatedPOMsMavenBridge.GOAL_ATTACH_MODIFIED_POMS, instantiationStrategy = InstantiationStrategy.SINGLETON, threadSafe = true)
+@Mojo(name = ManipulatingExtensionBridge.GOAL_ATTACH_MODIFIED_POMS, instantiationStrategy = InstantiationStrategy.SINGLETON, threadSafe = true)
 public class AttachManipulatedPOMs extends AbstractMojo {
 
     final private MavenSession mavenSession;
+
+    final private ManipulatingExtensionBridge mavenBridge;
 
     @Parameter(property = "dummy", required = false, defaultValue = "")
     private Boolean dummy;
 
     @Inject
-    AttachManipulatedPOMs(MavenSession session) {
+    AttachManipulatedPOMs(MavenSession session, ManipulatingExtensionBridge bridge) {
         mavenSession = session;
+        mavenBridge = bridge;
     }
-
-    private final JSONUtils.InternalObjectMapper reportMapper = new JSONUtils.InternalObjectMapper(new ObjectMapper());
 
     @Override
     public void execute() throws MojoExecutionException {
-        String body = mavenSession.getUserProperties().getProperty(ManipulationManager.REPORT_USER_PROPERTY_KEY);
-        if (Objects.isNull(body)) {
-            getLog().warn(AttachManipulatedPOMsMavenBridge.GOAL_ATTACH_MODIFIED_POMS
+        Optional<PME> optReport = mavenBridge.readReport(mavenSession);
+        if (optReport.isEmpty()) {
+            getLog().warn(ManipulatingExtensionBridge.GOAL_ATTACH_MODIFIED_POMS
                     + "shouldn't be executed alone. The Mojo " + "is a part of the plugin and executed automatically.");
-            return;
-        }
-
-        if ("{}".equalsIgnoreCase(body)) {
-            // We don't need to attach modified poms anymore.
             return;
         }
 
         mavenSession.getUserProperties().setProperty(ManipulationManager.REPORT_USER_PROPERTY_KEY, "{}");
 
         try {
-            PME report = reportMapper.readValue(body, PME.class);
 
             attachModifiedPomFilesToTheProject(mavenSession.getAllProjects(),
-                    report.getModules().stream().map(m -> m.getGav()).collect(Collectors.toSet()), null, true,
+                    optReport.get().getModules().stream().map(m -> m.getGav()).collect(Collectors.toSet()), null, false,
                     new ConsoleLogger());
 
         } catch (Exception ex) {
             throw new MojoExecutionException(
-                    "Unable to execute goal: " + AttachManipulatedPOMsMavenBridge.GOAL_ATTACH_MODIFIED_POMS, ex);
+                    "Unable to execute goal: " + ManipulatingExtensionBridge.GOAL_ATTACH_MODIFIED_POMS, ex);
         }
     }
 
@@ -118,10 +108,10 @@ public class AttachManipulatedPOMs extends AbstractMojo {
             underConstruction.setGroupId(parent.getGroupId());
             underConstruction.setGroupId(parent.getArtifactId());
             underConstruction.setVersion(parent.getVersion());
-            
+
             return this;
         }
-        
+
         GAVBuilder with(Model model) {
             Optional.ofNullable(model.getParent()).ifPresent(parent -> {
                 underConstruction.setGroupId(parent.getGroupId());
@@ -137,8 +127,6 @@ public class AttachManipulatedPOMs extends AbstractMojo {
         GAVBuilder with(MavenProject project) {
             return with(project.getModel());
         }
-        
-        
 
         static GAV from(Model model) {
             return new GAVBuilder().with(model).build();

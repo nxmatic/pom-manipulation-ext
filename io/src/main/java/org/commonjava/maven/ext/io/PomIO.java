@@ -20,7 +20,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -29,13 +28,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import javax.management.RuntimeErrorException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.reflect.FieldUtils;
@@ -54,6 +54,7 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.jdom.JDOMModelConverter;
+import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.session.MavenSessionHandler;
 import org.commonjava.maven.ext.common.util.LineSeparator;
@@ -62,8 +63,6 @@ import org.commonjava.maven.galley.maven.parse.PomPeek;
 import org.jdom2.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.vavr.CheckedFunction1;
 
 /**
  * Utility class used to read raw models for POMs, and rewrite any project POMs that were changed.
@@ -88,7 +87,9 @@ public class PomIO
 
     private final boolean parsePomTemplates;
 
-    private String manifestComment;
+    private final String manifestComment = buildManifestComment();
+    
+    protected final BiFunction<File, Path, File> pomResolver = (source,other) -> source.toPath().resolveSibling(other).toFile();
 
     @Inject
     public PomIO(MavenSessionHandler handler )
@@ -211,7 +212,7 @@ public class PomIO
 
     /**
      * For any project listed as changed (tracked by GA in the session), write the modified model out to disk
-     * in a temporary place and atttach it to the model.
+     * in a temporary place and attach it to the model.
      * Uses {@link ModelETL} to preserve as much formatting as possible.
      *
      * @param changed the modified Projects to write out.
@@ -220,22 +221,32 @@ public class PomIO
     public void writeTemporaryPOMs( final Set<Project> changed )
         throws ManipulationException
     {
-        writePOMs( changed, project -> {
+        Path path = Path.of("pom-manipulation-ext.xml");
+        writeTemporaryPOMs(changed, file -> pomResolver.apply(file, path));
+    }
+
+    /**
+     * For any project listed as changed (tracked by GA in the session), write the modified model out to disk
+     * in a temporary place and atttach it to the model.
+     * Uses {@link ModelETL} to preserve as much formatting as possible.
+     *
+     * @param changed the modified Projects to write out.
+     * @param resolver the modified POM path resolver.
+     * @throws ManipulationException if an error occurs.
+     */
+    public void writeTemporaryPOMs(final Set<Project> changed, Function<File, File> resolver)
+            throws ManipulationException {
+        writePOMs(changed, project -> {
             try {
-                return createManipulatedPOMFile( project.getPom() );
+                File source = project.getPom();
+                File target = resolver.apply(source);
+                return Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING).toFile();
             } catch (IOException cause) {
                 throw new RuntimeException("Unable to create temporary POM file", cause);
             }
         });
     }
-
-    private File createManipulatedPOMFile(File source) throws IOException {
-        final Path targetPath = source.toPath().getParent()
-          .resolve("pom-manipulation-ext.xml");
-
-        return Files.copy(source.toPath(), targetPath, StandardCopyOption.REPLACE_EXISTING)
-          .toFile();
-    }
+    
     /**
      * For any project listed as changed (tracked by GA in the session), write the modified model out to disk.
      * Uses {@link ModelETL} to preserve as much formatting as possible.
@@ -252,8 +263,6 @@ public class PomIO
     protected void writePOMs( final Set<Project> changed, final Function<Project, File> outputFile )
         throws ManipulationException
     {
-        manifestComment = "Modified by POM Manipulation Extension for Maven " +  ManifestUtils.getManifestInformation(PomIO.class);
-
         for ( final Project project : changed )
         {
             if (logger.isDebugEnabled())
@@ -270,6 +279,11 @@ public class PomIO
 
             model.setPomFile( pomFile );
         }
+    }
+
+
+    String buildManifestComment() {
+        return String.format("%s %s", MODIFIED_BY,  ManifestUtils.getManifestInformation(this.getClass()));
     }
 
 
