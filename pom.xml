@@ -236,6 +236,12 @@ x<?xml version="1.0"?>
       </dependency>
 
       <dependency>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>animal-sniffer-annotations</artifactId>
+        <version>1.23</version>
+      </dependency>
+
+      <dependency>
         <groupId>org.commonjava.maven.atlas</groupId>
         <artifactId>atlas-identities</artifactId>
         <version>${atlasVersion}</version>
@@ -635,7 +641,7 @@ x<?xml version="1.0"?>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>animal-sniffer-maven-plugin</artifactId>
-          <version>1.20</version>
+          <version>1.23</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
@@ -677,6 +683,10 @@ x<?xml version="1.0"?>
             <target>11</target>
             <testSource>11</testSource>
             <testTarget>11</testTarget>
+            <compilerArgs>
+              <arg>--system</arg>
+              <arg>${java.home}</arg>
+            </compilerArgs>
             <annotationProcessorPaths>
               <path>
                 <groupId>org.projectlombok</groupId>
@@ -801,11 +811,6 @@ x<?xml version="1.0"?>
             </goals>
             <configuration>
               <ignoreDependencies>true</ignoreDependencies>
-              <signature>
-                <groupId>org.codehaus.mojo.signature</groupId>
-                <artifactId>java18</artifactId>
-                <version>1.0</version>
-              </signature>
             </configuration>
           </execution>
         </executions>
