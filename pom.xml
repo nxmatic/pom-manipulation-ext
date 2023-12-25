@@ -16,7 +16,8 @@ x<?xml version="1.0"?>
     limitations under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
@@ -604,7 +605,8 @@ x<?xml version="1.0"?>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <configuration>
-            <argLine>@{argLine} -Djdk.attach.allowAttachSelf -Dorg.jboss.byteman.transform.all=true ${surefireSecurityManager}</argLine>
+            <argLine>@{argLine} -Djdk.attach.allowAttachSelf -Dorg.jboss.byteman.transform.all=true
+              ${surefireSecurityManager}</argLine>
             <redirectTestOutputToFile>true</redirectTestOutputToFile>
             <additionalClasspathElements>
               <additionalClasspathElement>${java.home}/../lib/tools.jar</additionalClasspathElement>
@@ -614,10 +616,10 @@ x<?xml version="1.0"?>
               <BYTEMAN_HOME />
             </environmentVariables>
             <systemProperties>
-                <property>
-                    <name>org.jboss.byteman.home</name>
-                  <value />
-                </property>
+              <property>
+                <name>org.jboss.byteman.home</name>
+                <value />
+              </property>
             </systemProperties>
           </configuration>
         </plugin>
@@ -665,15 +667,15 @@ x<?xml version="1.0"?>
             </dependency>
           </dependencies>
           <configuration>
-              <outputDirectory>${project.build.directory}/javadoc-generated-sources</outputDirectory>
-              <addOutputDirectory>false</addOutputDirectory>
-              <sourceDirectory>src/main/java</sourceDirectory>
-              <formatPreferences>
-                <javaLangAsFQN>skip</javaLangAsFQN>
-              </formatPreferences>
-           </configuration>
+            <outputDirectory>${project.build.directory}/javadoc-generated-sources</outputDirectory>
+            <addOutputDirectory>false</addOutputDirectory>
+            <sourceDirectory>src/main/java</sourceDirectory>
+            <formatPreferences>
+              <javaLangAsFQN>skip</javaLangAsFQN>
+            </formatPreferences>
+          </configuration>
         </plugin>
-	    <plugin>
+        <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.11.0</version>
           <configuration>
@@ -695,7 +697,7 @@ x<?xml version="1.0"?>
               </path>
             </annotationProcessorPaths>
           </configuration>
-	</plugin>
+        </plugin>
       </plugins>
     </pluginManagement>
 
@@ -743,16 +745,24 @@ x<?xml version="1.0"?>
               </docletArtifact>
               <links>
                 <!-- TODO: Doesn't seem to work in JDK 11 -->
-<!--                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-common/${project.version}</link>-->
-<!--                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-io/${project.version}</link>-->
-<!--                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-core/${project.version}</link>-->
-<!--                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-cli/${project.version}</link>-->
-<!--                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-ext/${project.version}</link>-->
-<!--                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-integration-test/${project.version}</link>-->
+                <!--
+                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-common/${project.version}</link>-->
+                <!--
+                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-io/${project.version}</link>-->
+                <!--
+                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-core/${project.version}</link>-->
+                <!--
+                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-cli/${project.version}</link>-->
+                <!--
+                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-ext/${project.version}</link>-->
+                <!--
+                <link>https://www.javadoc.io/doc/org.commonjava.maven.ext/pom-manipulation-integration-test/${project.version}</link>-->
 
-                <link>https://javadoc.io/doc/org.commonjava.maven.atlas/atlas-identities/${atlasVersion}</link>
+                <link>
+                  https://javadoc.io/doc/org.commonjava.maven.atlas/atlas-identities/${atlasVersion}</link>
                 <link>https://javadoc.io/doc/org.commonjava.maven.galley/galley-api/${galleyVersion}</link>
-                <link>https://javadoc.io/doc/org.commonjava.maven.galley/galley-maven/${galleyVersion}</link>
+                <link>
+                  https://javadoc.io/doc/org.commonjava.maven.galley/galley-maven/${galleyVersion}</link>
 
                 <link>https://maven.apache.org/ref/${mavenVersion}/maven-model/apidocs</link>
                 <link>https://maven.apache.org/ref/${mavenVersion}/maven-core/apidocs</link>
@@ -773,8 +783,8 @@ x<?xml version="1.0"?>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-	<!-- should go in a dedicated pom and injected by configuration  -->
-	<executions>
+        <!-- should go in a dedicated pom and injected by configuration  -->
+        <executions>
           <execution>
             <id>enforce-best-practices</id>
             <phase>initialize</phase>
@@ -794,8 +804,8 @@ x<?xml version="1.0"?>
                 </requirePluginVersions>
               </rules>
             </configuration>
-	  </execution>
-	</executions>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -871,7 +881,8 @@ x<?xml version="1.0"?>
         <jdk>[18,]</jdk>
       </activation>
       <properties>
-        <!-- Security manager under JDK18 causes issues: https://github.com/stefanbirkner/system-rules/issues/85 -->
+        <!-- Security manager under JDK18 causes issues:
+        https://github.com/stefanbirkner/system-rules/issues/85 -->
         <surefireSucurityManager>-Djava.security.manager=allow</surefireSucurityManager>
       </properties>
     </profile>
@@ -879,23 +890,23 @@ x<?xml version="1.0"?>
     <profile>
       <id>redhat-ga</id>
       <activation>
-	<activeByDefault>true</activeByDefault>
+        <activeByDefault>true</activeByDefault>
       </activation>
       <build>
-	<plugins>
-	  <plugin>
+        <plugins>
+          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-enforcer-plugin</artifactId>
-	    <executions>
+            <executions>
               <execution>
-		<id>enforce-best-practices</id>
-		<phase>initialize</phase>
-		<goals>
-		  <goal>enforce</goal>
-		</goals>
-		<configuration>
-		  <fail>false</fail>
-		  <rules>
+                <id>enforce-best-practices</id>
+                <phase>initialize</phase>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <fail>false</fail>
+                  <rules>
                     <reactorModuleConvergence />
                     <requireNoRepositories />
                     <requirePluginVersions>
@@ -904,26 +915,26 @@ x<?xml version="1.0"?>
                       <banSnapshots />
                       <unCheckedPluginList>org.eclipse.m2e:lifecycle-mapping</unCheckedPluginList>
                     </requirePluginVersions>
-		  </rules>
-		</configuration>
-	      </execution>
-	    </executions>
-	  </plugin>
-	</plugins>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
       </build>
       <repositories>
-	<repository>
-	  <id>redhat-ga</id>
-	  <url>https://maven.repository.redhat.com/ga/</url>
-	  <releases>
-              <enabled>true</enabled>
-              <checksumPolicy>fail</checksumPolicy>
-              <updatePolicy>never</updatePolicy>
-	  </releases>
-	  <snapshots>
+        <repository>
+          <id>redhat-ga</id>
+          <url>https://maven.repository.redhat.com/ga/</url>
+          <releases>
+            <enabled>true</enabled>
+            <checksumPolicy>fail</checksumPolicy>
+            <updatePolicy>never</updatePolicy>
+          </releases>
+          <snapshots>
             <enabled>false</enabled>
-	  </snapshots>
-	</repository>
+          </snapshots>
+        </repository>
       </repositories>
     </profile>
   </profiles>
