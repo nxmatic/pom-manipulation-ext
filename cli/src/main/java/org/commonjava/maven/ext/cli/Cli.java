@@ -308,7 +308,7 @@ public class Cli implements Callable<Integer>
             else if (printManipulatorOrder)
             {
                 System.out.println ("\u001B[32mManipulator order is:\033[0m");
-                manipulationManager.getOrderedManipulators().forEach
+                session.getManipulators().forEach
                         (m -> System.out.format( "%-20s%-40s%n",
                                                  StringUtils.center( String.valueOf( m.getExecutionIndex() ), 20),
                                                  m.getClass().getSimpleName()));

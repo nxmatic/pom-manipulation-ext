@@ -16,6 +16,8 @@
 package org.commonjava.maven.ext.core;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +34,7 @@ import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Settings;
+import org.codehaus.plexus.logging.Logger;
 import org.commonjava.maven.ext.annotation.ConfigValue;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.json.PME;
@@ -42,29 +45,68 @@ import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.state.CommonState;
 import org.commonjava.maven.ext.core.state.State;
 import org.commonjava.maven.ext.core.state.VersioningState;
+import org.commonjava.maven.ext.core.util.ManipulatorPriorityComparator;
+import org.commonjava.maven.ext.io.resolver.MavenEventSpy;
+
+import lombok.Getter;
 
 /**
- * Repository for components that help manipulate POMs as needed, and state related to each {@link Manipulator}
- * (which contains configuration and changes to be applied). This is basically a clearing house for state required by the different parts of the
- * manipulator extension.
+ * Repository for components that help manipulate POMs as needed, and state related to each {@link Manipulator} (which
+ * contains configuration and changes to be applied). This is basically a clearing house for state required by the
+ * different parts of the manipulator extension.
  *
  * @author jdcasey
  */
 @Named
 @Singleton
-public class ManipulationSession
-                implements MavenSessionHandler
-{
-    @ConfigValue( docIndex = "../index.html#disabling-the-extension")
+public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.MavenSessionInjector {
+    @ConfigValue(docIndex = "../index.html#disabling-the-extension")
     private static final String MANIPULATIONS_DISABLED_PROP = "manipulation.disable";
 
     private final Map<Class<?>, State> states = new HashMap<>();
 
-    @Inject
-    private ManipulatingExtensionBridge mavenBridge;
-    
+    @Inject private ManipulatingExtensionBridge mojoBridge;
+
+    @Inject private Logger logger;
+
+    /**
+     * Determined from {@link Manipulator#getExecutionIndex()} comparisons during
+     * {@link ManipulationManager#init(ManipulationSession)}.
+     *
+     * @return the ordered manipulators
+     */
+    @Getter
+    List<Manipulator> manipulators = Collections.emptyList();
+
+
+    /**
+     * manager delegate which initialize the manipulators for the session
+     * {@link ManipulationManager#init(ManipulationSession)}.
+     *
+     */
+    void initManipulators(Collection<Manipulator> manipulators) throws ManipulationException {
+        List<Manipulator> orderedManipulators
+                = new ArrayList<>(manipulators);
+
+        // The RESTState depends upon the VersionState being initialised. Therefore
+        // initialise in reverse order
+        // and do a final sort to run in the correct order. See the Manipulator
+        // interface for detailed discussion
+        // on ordered.
+        orderedManipulators.sort(Collections.reverseOrder(new ManipulatorPriorityComparator()));
+
+        for (final Manipulator manipulator : orderedManipulators) {
+            logger.debug("Initialising manipulator " + manipulator.getClass()
+                    .getSimpleName());
+            manipulator.init(this);
+        }
+        orderedManipulators.sort(new ManipulatorPriorityComparator());
+        
+        this.manipulators = orderedManipulators;
+    }
+
     private MavenSession mavenSession;
-    
+
     private Optional<PME> previousReport;
 
     /**
@@ -74,28 +116,20 @@ public class ManipulationSession
 
     private ManipulationException error;
 
-    public ManipulationSession()
-    {
-        System.out.println( "[INFO] Running Maven Manipulation Extension (PME) " + ManifestUtils.getManifestInformation(ManipulationSession.class) );
-    }
-
     /**
-     * True (enabled) by default, this is the kill switch for all manipulations. Manipulator implementations MAY also be enabled/disabled
-     * individually.
+     * True (enabled) by default, this is the kill switch for all manipulations. Manipulator implementations MAY also be
+     * enabled/disabled individually.
      *
      * @see #MANIPULATIONS_DISABLED_PROP
      * @see VersioningState#isEnabled()
-     *
      * @return whether the PME subsystem is enabled.
      */
-    public boolean isEnabled()
-    {
-        return !Boolean.parseBoolean( getUserProperties().getProperty( MANIPULATIONS_DISABLED_PROP, "false" ) );
+    public boolean isEnabled() {
+        return !Boolean.parseBoolean(getUserProperties().getProperty(MANIPULATIONS_DISABLED_PROP, "false"));
     }
 
-    public void setState( final State state )
-    {
-        states.put( state.getClass(), state );
+    public void setState(final State state) {
+        states.put(state.getClass(), state);
     }
 
     /**
@@ -104,165 +138,148 @@ public class ManipulationSession
      *
      * @throws ManipulationException if an error occurs
      */
-    public void reinitialiseStates() throws ManipulationException
-    {
-        for (State s : states.values() )
-        {
-            s.initialise( getUserProperties() );
+    public void reinitialiseStates() throws ManipulationException {
+        for (State s : states.values()) {
+            s.initialise(getUserProperties());
         }
     }
 
-    public <T extends State> T getState( final Class<T> stateType )
-    {
-        return stateType.cast( states.get( stateType ) );
+    public <T extends State> T getState(final Class<T> stateType) {
+        return stateType.cast(states.get(stateType));
     }
 
-    public void setMavenSession( final MavenSession mavenSession )
-    {
+    public void setMavenSession(final MavenSession mavenSession) {
         this.mavenSession = mavenSession;
-        this.previousReport = mavenBridge.readReport(mavenSession);
+        this.previousReport = mojoBridge.readReport(mavenSession);
+    }
+    
+    @Override
+    public void inject(final MavenSession mavenSession) {
+        setMavenSession(mavenSession);
     }
 
     @Override
-    public Properties getUserProperties()
-    {
-         return userProperties;
+    public Properties getUserProperties() {
+        return userProperties;
     }
 
     class UserProperties extends Properties {
 
-	    static final long serialVersionUID = 1L;
+        static final long serialVersionUID = 1L;
 
-		@Override
-		public String getProperty(String key) {
-			if (mavenSession == null) {
-				return null;
-			}
-			return Optional.ofNullable(userProperties().getProperty(key))
-					.orElse(activeProfilesProperties().getProperty(key));
-		}
+        @Override
+        public String getProperty(String key) {
+            if (mavenSession == null) {
+                return null;
+            }
+            return Optional.ofNullable(userProperties().getProperty(key))
+                           .orElse(activeProfilesProperties().getProperty(key));
+        }
 
-		Properties userProperties() {
-			return mavenSession.getRequest().getUserProperties();
-		}
+        Properties userProperties() {
+            return mavenSession.getRequest().getUserProperties();
+        }
 
-		Properties activeProfilesProperties() {
+        Properties activeProfilesProperties() {
             List<String> activeProfileIds = mavenSession.getSettings().getActiveProfiles();
 
-            return mavenSession.getSettings().getProfiles().stream()
-                .filter(profile -> activeProfileIds.contains(profile.getId()))
-                .map(Profile::getProperties)
-                .collect(Properties::new, (props1, props2) -> props1.putAll(props2), (props1, props2) -> {});
-		}
-	};
-	
-	final UserProperties userProperties = new UserProperties();
+            return mavenSession.getSettings()
+                               .getProfiles()
+                               .stream()
+                               .filter(profile -> activeProfileIds.contains(profile.getId()))
+                               .map(Profile::getProperties)
+                               .collect(Properties::new, (props1, props2) -> props1.putAll(props2),
+                                       (props1, props2) -> {
+                                       });
+        }
+    };
 
+    final UserProperties userProperties = new UserProperties();
 
-
-    public void setProjects( final List<Project> projects )
-    {
+    public void setProjects(final List<Project> projects) {
         this.projects = projects;
     }
 
-    public List<Project> getProjects()
-    {
+    public List<Project> getProjects() {
         return projects;
     }
 
     @Override
-    public List<ArtifactRepository> getRemoteRepositories()
-    {
-        return mavenSession == null ? null : mavenSession.getRequest()
-                                                         .getRemoteRepositories();
+    public List<ArtifactRepository> getRemoteRepositories() {
+        return mavenSession == null ? null : mavenSession.getRequest().getRemoteRepositories();
     }
 
-
     @Override
-    public File getPom() throws ManipulationException
-    {
-        if (mavenSession == null)
-        {
-            throw new ManipulationException( "Invalid session" );
+    public File getPom() throws ManipulationException {
+        if (mavenSession == null) {
+            throw new ManipulationException("Invalid session");
         }
 
         return mavenSession.getRequest().getPom();
     }
 
     @Override
-    public File getTargetDir()
-    {
-        if ( mavenSession == null )
-        {
-            return new File( "target" );
+    public File getTargetDir() {
+        if (mavenSession == null) {
+            return new File("target");
         }
 
-        final File pom = mavenSession.getRequest()
-                                     .getPom();
-        if ( pom == null )
-        {
-            return new File( "target" );
+        final File pom = mavenSession.getRequest().getPom();
+        if (pom == null) {
+            return new File("target");
         }
 
-        return new File( pom.getParentFile(), "target" );
+        return new File(pom.getParentFile(), "target");
     }
 
     @Override
-    public ArtifactRepository getLocalRepository()
-    {
-        return mavenSession == null ? null : mavenSession.getRequest()
-                                                         .getLocalRepository();
+    public ArtifactRepository getLocalRepository() {
+        return mavenSession == null ? null : mavenSession.getRequest().getLocalRepository();
     }
 
     /**
      * Used by extension ManipulatingEventSpy to store any errors during project construction and manipulation
+     * 
      * @param error record any exception that occurred.
      */
-    public void setError( final ManipulationException error )
-    {
+    public void setError(final ManipulationException error) {
         this.error = error;
     }
 
     /**
-     * Used by extension ManipulatinglifeCycleParticipant to retrieve any errors stored
-     * by ManipulatingEventSpy
+     * Used by extension ManipulatinglifeCycleParticipant to retrieve any errors stored by ManipulatingEventSpy
+     * 
      * @return ManipulationException
      */
-    public ManipulationException getError()
-    {
+    public ManipulationException getError() {
         return error;
     }
 
     @Override
-    public List<String> getActiveProfiles()
-    {
-        return mavenSession == null || mavenSession.getRequest() == null ? Collections.emptyList() : mavenSession.getRequest().getActiveProfiles();
+    public List<String> getActiveProfiles() {
+        return mavenSession == null || mavenSession.getRequest() == null ? Collections.emptyList()
+                : mavenSession.getRequest().getActiveProfiles();
     }
 
     @Override
-    public Settings getSettings()
-    {
+    public Settings getSettings() {
         return mavenSession == null ? null : mavenSession.getSettings();
     }
 
-
     /**
-     * Checks all known states to determine whether any are enabled. Will ignore any states within
-     * the supplied list.
+     * Checks all known states to determine whether any are enabled. Will ignore any states within the supplied list.
+     * 
      * @param ignoreList the list of States that should be ignored when checking if any are enabled.
      * @return whether any of the States are enabled.
      */
-    public boolean anyStateEnabled( List<Class<? extends State>> ignoreList )
-    {
+    public boolean anyStateEnabled(List<Class<? extends State>> ignoreList) {
         boolean result = false;
 
-        for ( final Entry<Class<?>, State> entry : states.entrySet() )
-        {
+        for (final Entry<Class<?>, State> entry : states.entrySet()) {
             final Class<?> c = entry.getKey();
             final State state = entry.getValue();
 
-            if ( !ignoreList.contains( c ) && state.isEnabled() )
-            {
+            if (!ignoreList.contains(c) && state.isEnabled()) {
                 result = true;
                 break;
             }
@@ -271,12 +288,10 @@ public class ManipulationSession
     }
 
     @Override
-    public List<String> getExcludedScopes()
-    {
+    public List<String> getExcludedScopes() {
         // In some tests, CommonState is not available so check for it first.
-        if ( states.containsKey( CommonState.class ) )
-        {
-            return getState( CommonState.class ).getExcludedScopes();
+        if (states.containsKey(CommonState.class)) {
+            return getState(CommonState.class).getExcludedScopes();
         }
         return Collections.emptyList();
     }
@@ -284,17 +299,15 @@ public class ManipulationSession
     /**
      * @return Returns the current MavenSession
      */
-    MavenSession getSession()
-    {
+    MavenSession getSession() {
         return mavenSession;
     }
 
     /**
-     * 
      * @return the previous manipulation report if anyx
      */
     Optional<PME> getPreviousReport() {
         return previousReport;
     }
-  
+
 }

@@ -29,6 +29,8 @@
 
   <packaging>maven-plugin</packaging>
 
+  <version>4.17-SNAPSHOT</version>
+
   <name>POM Manipulation for Maven Extension</name>
 
   <dependencies>
@@ -226,6 +228,12 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>io.vavr</groupId>
+      <artifactId>vavr</artifactId>
+    </dependency>
+
   </dependencies>
 
 
@@ -304,3 +312,6 @@
     </plugins>
   </build>
 </project>
+<!--
+Modified by POM Manipulation Extension for Maven 4.16 ( SHA: 352ae4a7 )
+-->

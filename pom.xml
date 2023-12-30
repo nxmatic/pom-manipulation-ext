@@ -91,7 +91,7 @@ x<?xml version="1.0"?>
     <slf4jVersion>2.0.9</slf4jVersion>
     <logbackVersion>1.3.12</logbackVersion>
     <docletVersion>1.1</docletVersion>
-    <lombokVersion>1.18.30</lombokVersion>
+    <lombokVersion>0.0.0-dev</lombokVersion>
     <lombokPluginVersion>1.18.20.0</lombokPluginVersion>
     <shadePluginVersion>3.2.4</shadePluginVersion>
 
@@ -481,9 +481,9 @@ x<?xml version="1.0"?>
       </dependency>
 
       <dependency>
-        <groupId>io.vavr</groupId>
-        <artifactId>vavr</artifactId>
-        <version>1.0.0-alpha-4</version>
+	<groupId>io.vavr</groupId>
+	<artifactId>vavr</artifactId>
+	<version>0.10.4</version>
       </dependency>
 
       <!-- Add this as Unirest / Galley have different versions -->
@@ -566,6 +566,11 @@ x<?xml version="1.0"?>
             </execution>
           </executions>
         </plugin>
+	<plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>3.3.0</version>
+	</plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-resources-plugin</artifactId>
@@ -703,6 +708,19 @@ x<?xml version="1.0"?>
 
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>verify</phase>
+            <goals>
+	      <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok-maven-plugin</artifactId>
         <executions>
@@ -783,6 +801,7 @@ x<?xml version="1.0"?>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
+	<version>3.4.1</version>
         <!-- should go in a dedicated pom and injected by configuration  -->
         <executions>
           <execution>

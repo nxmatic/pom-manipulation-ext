@@ -29,6 +29,9 @@ import java.io.File;
  */
 public interface ExtensionInfrastructure
 {
+    
+    Default NULL = new Default();
+    
     ExtensionInfrastructure init( ) throws ManipulationException;
 
     // Only used for tests
@@ -38,4 +41,31 @@ public interface ExtensionInfrastructure
     ExtensionInfrastructure init( File cacheDir ) throws ManipulationException;
 
     void finish();
-}
+    
+    
+    class Default implements ExtensionInfrastructure {
+
+        @Override
+        public ExtensionInfrastructure init() throws ManipulationException {
+            return this;
+        }
+
+        @Override
+        public ExtensionInfrastructure init(Location customLocation, Transport customTransport, File cacheDir)
+                throws ManipulationException {
+            return this;
+        }
+
+        @Override
+        public ExtensionInfrastructure init(File cacheDir) throws ManipulationException {
+            return this;
+        }
+
+        @Override
+        public void finish() {
+            
+        }
+        
+    }
+    
+  }
