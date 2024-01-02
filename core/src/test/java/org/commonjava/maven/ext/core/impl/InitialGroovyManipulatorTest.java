@@ -74,7 +74,7 @@ public class InitialGroovyManipulatorTest
         userProperties.setProperty( "groovyScripts", groovy.toURI().toString() );
 
         TestUtils.SMContainer smc = TestUtils.createSessionAndManager( userProperties, projectroot );
-        smc.getManager().scanAndApply( smc.getSession() );
+        smc.getManager().scanAndApply(  );
 
         // re-read the projects:
         projects = pomIO.parseProject( projectroot );

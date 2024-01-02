@@ -24,10 +24,10 @@ import org.apache.maven.model.Parent;
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.PluginManagement;
 import org.apache.maven.model.Profile;
-import org.commonjava.maven.atlas.ident.ref.ArtifactRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectVersionRef;
-import org.commonjava.maven.atlas.ident.util.VersionUtils;
+import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectVersionRef;
+import org.commonjava.atlas.maven.ident.util.VersionUtils;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.session.MavenSessionHandler;
 import org.commonjava.maven.ext.common.util.ProfileUtils;
@@ -501,9 +501,9 @@ public class Project
                 if ( pm != null )
                 {
                     resolvePlugins( session, pm.getPlugins(), PluginResolver.PLUGIN_DEFAULTS, profileDeps );
+                    resolvedProfileManagedPlugins.put( profile, profileDeps );
                 }
             }
-            resolvedProfileManagedPlugins.put( profile, profileDeps );
         }
         return resolvedProfileManagedPlugins;
     }

@@ -21,8 +21,8 @@ import org.codehaus.plexus.DefaultContainerConfiguration;
 import org.codehaus.plexus.DefaultPlexusContainer;
 import org.codehaus.plexus.PlexusConstants;
 import org.codehaus.plexus.PlexusContainer;
-import org.commonjava.maven.atlas.ident.ref.ProjectRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.core.ManipulationSession;
@@ -82,7 +82,7 @@ public class BaseScriptTest
         Project root = projects.stream().filter( p -> p.getProjectParent() == null ).findAny().orElse( null );
         logger.info( "Found project root {}", root );
 
-        InitialGroovyManipulator gm = new InitialGroovyManipulator( null, null, null );
+        InitialGroovyManipulator gm = new InitialGroovyManipulator( null, null );
         gm.init( ms );
         TestUtils.executeMethod( gm, "applyGroovyScript", new Class[] { List.class, Project.class, File.class },
                                  new Object[] { projects, root, groovy } );
@@ -103,7 +103,7 @@ public class BaseScriptTest
         Project root = projects.stream().filter( p -> p.getProjectParent() == null ).findAny().orElse( null );
         logger.info( "Found project root {}", root );
 
-        FinalGroovyManipulator gm = new FinalGroovyManipulator( null, null, null );
+        FinalGroovyManipulator gm = new FinalGroovyManipulator( null, null );
         gm.init( ms );
         TestUtils.executeMethod( gm, "applyGroovyScript", new Class[] { List.class, Project.class, File.class },
                                  new Object[] { projects, root, groovy } );
@@ -122,7 +122,8 @@ public class BaseScriptTest
                                                     .getParentFile()
                                                     .getParentFile(), "pom.xml" );
         PomIO pomIO = new PomIO();
-        FileIO fileIO = new FileIO( new GalleyInfrastructure( null, null ).init( temporaryFolder.newFolder() ) );
+        FileIO fileIO = new FileIO(  );
+        fileIO.injectInfra( new GalleyInfrastructure( null, null ).init( temporaryFolder.newFolder() ) );
 
         List<Project> projects = pomIO.parseProject( projectroot );
         ManipulationSession ms = TestUtils.createSession( null, projectroot );
@@ -144,7 +145,7 @@ public class BaseScriptTest
         };
         bs.setValues( pomIO, fileIO, null, ms, projects, root, null );
 
-        bs.inlineProperty( root, SimpleProjectRef.parse( "org.commonjava.maven.atlas:atlas-identities" ) );
+        bs.inlineProperty( root, SimpleProjectRef.parse( "org.commonjava.atlas.maven:atlas-identities" ) );
         bs.inlineProperty( root, SimpleProjectRef.parse( "org.commonjava.maven.galley:*" ) );
 
         try
@@ -237,7 +238,7 @@ public class BaseScriptTest
         Project root = projects.stream().filter( p -> p.getProjectParent() == null ).findAny().orElse( null );
         logger.info( "Found project root {}", root );
 
-        InitialGroovyManipulator gm = new InitialGroovyManipulator( null, null, null );
+        InitialGroovyManipulator gm = new InitialGroovyManipulator( null, null );
         gm.init( session );
         TestUtils.executeMethod( gm, "applyGroovyScript", new Class[] { List.class, Project.class, File.class },
                                  new Object[] { projects, root, groovy } );
@@ -284,7 +285,8 @@ public class BaseScriptTest
 
         final PlexusContainer container = new DefaultPlexusContainer( config );
         InitialGroovyManipulator gm = container.lookup( InitialGroovyManipulator.class );
-        FileIO fileIO = new FileIO(
+        FileIO fileIO = new FileIO();
+        fileIO.injectInfra(       
                         new GalleyInfrastructure( session, null).init( null, null, temporaryFolder.newFolder( "cache-dir" ) )) ;
         // Update the groovy manipulator with fileIO with a temporary folder for the cache directory.
         FieldUtils.writeField( gm, "fileIO", fileIO, true );

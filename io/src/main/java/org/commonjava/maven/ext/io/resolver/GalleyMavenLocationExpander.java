@@ -26,7 +26,7 @@ import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Repository;
 import org.apache.maven.settings.RepositoryPolicy;
 import org.apache.maven.settings.Settings;
-import org.commonjava.maven.atlas.ident.util.JoinString;
+import org.commonjava.atlas.maven.ident.util.JoinString;
 import org.commonjava.maven.galley.TransferException;
 import org.commonjava.maven.galley.model.ConcreteResource;
 import org.commonjava.maven.galley.model.Location;
@@ -54,7 +54,7 @@ import java.util.Set;
  *
  * @author jdcasey
  */
-public class MavenLocationExpander
+public class GalleyMavenLocationExpander
     implements LocationExpander
 {
 
@@ -69,7 +69,7 @@ public class MavenLocationExpander
 
     private final Logger logger = LoggerFactory.getLogger( getClass() );
 
-    public MavenLocationExpander( final List<Location> customLocations,
+    public GalleyMavenLocationExpander( final List<Location> customLocations,
                                   final List<ArtifactRepository> artifactRepositories,
                                   final ArtifactRepository localRepository, final MirrorSelector mirrorSelector,
                                   final Settings settings, final List<String> activeProfiles )

@@ -46,7 +46,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class XMLIO
 {

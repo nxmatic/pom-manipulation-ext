@@ -41,7 +41,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith( PlexusTestRunner.class )
-@Named
+@Named("pom-manipulation")
 public class ManipulationManagerTest
 {
     @Rule
@@ -106,7 +106,7 @@ public class ManipulationManagerTest
         p.put( ManipulationManager.REWRITE_CHANGED, "false" );
 
         TestUtils.SMContainer smc = TestUtils.createSessionAndManager( p, projectRoot );
-        smc.getManager().scanAndApply( smc.getSession() );
+        smc.getManager().scanAndApply( );
 
         assertTrue( systemRule.getLog().contains( "Maven-Manipulation-Extension: Finished" ) );
         assertTrue( FileUtils.contentEquals( projectRoot, projectRootBackup) );

@@ -51,7 +51,8 @@ public class FileIOTest
         File res = folder.newFolder();
         GalleyInfrastructure galleyInfra = new GalleyInfrastructure
                         ( null, null).init( null, null, res );
-        fileIO = new FileIO( galleyInfra );
+        fileIO = new FileIO( );
+        fileIO.injectInfra(galleyInfra);
    }
 
     @Test

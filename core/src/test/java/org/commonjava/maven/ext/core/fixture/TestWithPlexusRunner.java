@@ -25,7 +25,7 @@ import javax.inject.Named;
 import static org.junit.Assert.assertNotNull;
 
 @RunWith( PlexusTestRunner.class )
-@Named
+@Named("pom-manipulation")
 public class TestWithPlexusRunner
 {
     @Inject

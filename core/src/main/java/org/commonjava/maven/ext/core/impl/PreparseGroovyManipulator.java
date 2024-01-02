@@ -43,9 +43,9 @@ public class PreparseGroovyManipulator
     extends BaseGroovyManipulator
 {
     @Inject
-    public PreparseGroovyManipulator( ModelIO modelIO, FileIO fileIO, PomIO pomIO )
+    public PreparseGroovyManipulator( FileIO fileIO, PomIO pomIO )
     {
-        super( modelIO, fileIO, pomIO );
+        super( fileIO, pomIO );
     }
 
     /**

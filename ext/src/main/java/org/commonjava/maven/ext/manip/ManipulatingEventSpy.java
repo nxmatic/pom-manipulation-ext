@@ -15,104 +15,75 @@
  */
 package org.commonjava.maven.ext.manip;
 
-import java.io.File;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.concurrent.Semaphore;
-
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.apache.maven.eventspy.AbstractEventSpy;
 import org.apache.maven.execution.ExecutionEvent;
-import org.apache.maven.execution.ExecutionEvent.Type;
-import org.apache.maven.execution.MavenSession;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.common.util.ManifestUtils;
+import org.codehaus.plexus.PlexusContainer;
 import org.commonjava.maven.ext.core.ManipulationManager;
-import org.commonjava.maven.ext.core.ManipulationSession;
-import org.commonjava.maven.ext.core.util.PropertiesUtils;
-import org.commonjava.maven.ext.io.ConfigIO;
-import org.eclipse.sisu.Priority;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import io.vavr.control.Try;
 
 /**
  * Implements hooks necessary to apply modifications in the Maven bootstrap, before the build starts.
  * 
  * @author jdcasey
  */
-@SuppressWarnings("unused")
 @Named
 @Singleton
 public class ManipulatingEventSpy extends AbstractEventSpy {
-    private final Logger logger = LoggerFactory.getLogger(getClass());
-
-    private final ManipulationManager manipulationManager;
-
-    private final ManipulationSession session;
-
-    private final Semaphore semaphore = new Semaphore(1);
-
-    private final ConfigIO configIO;
 
     @Inject
-    public ManipulatingEventSpy(ManipulationManager manipulationManager, ManipulationSession session,
-            ConfigIO configIO) {
-        this.manipulationManager = manipulationManager;
-        this.session = session;
-        this.configIO = configIO;
+    // Collections are injected dynamically supporting the session scoped beans
+    private ManipulationManager manager;
+    
+    @Inject
+    PlexusContainer container;
+
+    boolean isEnabled = true;
+    
+    @PostConstruct
+    public void init() {        
+        isEnabled = Try.success(ManipulatingEventSpy.class.getPackageName())
+                  .map(name -> name.concat(".ManipulatingLifeCycleParticipant"))
+                  .mapTry(container::hasComponent)
+                  .map(Boolean.FALSE::equals)
+                  .recover(__ -> Boolean.TRUE)
+                  .get()
+                  .booleanValue();
     }
 
+    /**
+     * This is the entry point for the extension. This is called by Maven and we pass control to the
+     * ManipulationManager.
+     */
     @Override
     public void onEvent(final Object event) throws Exception {
+        if (!isEnabled) {
+            return;
+        }
         if (!(event instanceof ExecutionEvent)) {
             return;
         }
+        
         final ExecutionEvent ee = (ExecutionEvent) event;
         final ExecutionEvent.Type type = ee.getType();
-
-        if (type != Type.ProjectDiscoveryStarted) {
-            return;
-        }
-
-        if (!session.isEnabled()) {
-            logger.info("Manipulation engine disabled via command-line option");
-            return;
-        }
-
-        final MavenSession mavenSession = ee.getSession();
-
-        final File pomFile = mavenSession.getRequest().getPom();
-        if (pomFile == null) {
-            logger.error("Manipulation cannot locate request POM file");
-            return;
-        }
-
-        try {
-            Properties config = configIO.parse(pomFile.getParentFile());
-            PropertiesUtils.handleConfigPrecedence(session.getUserProperties(), config);
-
-            if (new File(pomFile.getParentFile(), ManipulationManager.MARKER_FILE).exists()) {
-                logger.info("Skipping manipulation as previous execution found.");
-                return;
-            }
-            logger.info("Running Maven Manipulation Extension (PME) "
-                    + ManifestUtils.getManifestInformation(ManipulatingEventSpy.class));
-            manipulationManager.init(session);
-            manipulationManager.scanAndApply(session);
-        } // Catch manipulation error and fail the build
-        catch (final ManipulationException e) {
-            logger.error("Extension failure", e);
-            session.setError(e);
-        }
-        // Catch any runtime exceptions and mark them to fail the build as well.
-        catch (final RuntimeException e) {
-            logger.error("Extension failure", e);
-            session.setError(new ManipulationException("Caught runtime exception", e));
-        } finally {
-            super.onEvent(event);
+        switch (type) {
+        case ProjectDiscoveryStarted:
+            scanAndApply();
+            break;
+        case SessionEnded:
+            break;
+        default:
+            break;
         }
     }
+
+    void scanAndApply() {
+            manager.scanAndApply();
+    }
+
 }

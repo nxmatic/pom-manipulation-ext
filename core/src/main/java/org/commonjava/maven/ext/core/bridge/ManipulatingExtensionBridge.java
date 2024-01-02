@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.commonjava.maven.ext.core;
+package org.commonjava.maven.ext.core.bridge;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,6 +35,7 @@ import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.util.JSONUtils;
+import org.commonjava.maven.ext.core.ManipulationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * It sets the manipulated POM as the source and injects a JSON report, which includes the new POM file paths,
  * into the user properties for later retrieval by the MOJO.
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class ManipulatingExtensionBridge {
 

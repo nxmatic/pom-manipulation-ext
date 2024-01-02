@@ -22,13 +22,19 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
@@ -37,25 +43,33 @@ import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.maven.execution.MavenExecutionRequest;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.profiles.DefaultProfileManager;
 import org.apache.maven.profiles.activation.ProfileActivationException;
 import org.apache.maven.project.ProjectBuilder;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.maven.ext.annotation.ConfigValue;
+import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.util.JSONUtils;
+import org.commonjava.maven.ext.common.util.ManifestUtils;
 import org.commonjava.maven.ext.common.util.ProjectComparator;
 import org.commonjava.maven.ext.common.util.WildcardMap;
+import org.commonjava.maven.ext.core.bridge.ManipulatingExtensionBridge;
 import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.impl.PreparseGroovyManipulator;
-import org.commonjava.maven.ext.core.state.CommonState;
-import org.commonjava.maven.ext.core.state.DependencyState;
 import org.commonjava.maven.ext.core.state.RelocationState;
+import org.commonjava.maven.ext.core.util.PropertiesUtils;
+import org.commonjava.maven.ext.io.ConfigIO;
 import org.commonjava.maven.ext.io.PomIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.vavr.CheckedConsumer;
+import io.vavr.control.Try;
 
 /**
  * Coordinates manipulation of the POMs in a build, by providing methods to read the project set from files ahead of the
@@ -70,9 +84,9 @@ import org.slf4j.LoggerFactory;
  *
  * @author jdcasey
  */
-@Named
+@Named(ManipulationComponent.HINT)
 @Singleton
-public class ManipulationManager {
+public class ManipulationManager implements ManipulationComponent {
     private static final String MARKER_PATH = "target";
 
     public static final String MARKER_FILE = MARKER_PATH + File.separatorChar + "pom-manip-ext-marker.txt";
@@ -92,27 +106,36 @@ public class ManipulationManager {
 
     @ConfigValue(docIndex = "../index.html#write-changed")
     public static final String REWRITE_CHANGED = "manipulationWriteChanged";
+    
+    public static Function<ManipulationSession, Boolean> isWriteChanged = session -> Boolean.parseBoolean(
+            session.getUserProperties().getProperty(REWRITE_CHANGED, "true"));
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private final Map<String, Manipulator> manipulators;
+    private final ConfigIO configIO;
 
     private final PomIO pomIO;
 
     private final ManipulatingExtensionBridge mavenBridge;
+
+    private final Set<Manipulator> manipulators;
 
     private final PreparseGroovyManipulator preparseGroovyManipulator;
 
     private final PME jsonReport = new PME();
 
     @Inject
-    public ManipulationManager(Map<String, Manipulator> manipulators, PomIO pomIO,
-            ManipulatingExtensionBridge mavenBridge, PreparseGroovyManipulator preparseGroovyManipulator) {
-        this.manipulators = manipulators;
+    public ManipulationManager(ConfigIO configIO, PomIO pomIO, ManipulatingExtensionBridge mavenBridge,
+            Set<Manipulator> manipulators, PreparseGroovyManipulator preparseGroovyManipulator) {
+        this.configIO = configIO;
         this.pomIO = pomIO;
         this.mavenBridge = mavenBridge;
+        this.manipulators = manipulators;
         this.preparseGroovyManipulator = preparseGroovyManipulator;
     }
+
+    @Inject
+    private Collection<ManipulationSession> sessions;
 
     public void init(ManipulationSession session) throws ManipulationException {
         logger.debug("Initialising ManipulationManager with user properties {}", session.getUserProperties());
@@ -133,24 +156,110 @@ public class ManipulationManager {
                                       .forEach(up -> deprecatedUsage.put(p, up.getKey()));
         });
         if (deprecatedUsage.size() > 0) {
-            deprecatedUsage.forEach((k, v) -> logger.warn(
-                    "Located deprecated property {} in user properties (with matcher of {})", k, v));
+            deprecatedUsage.forEach((k,
+                    v) -> logger.warn("Located deprecated property {} in user properties (with matcher of {})", k, v));
             if (deprecatedDisabled) {
                 throw new ManipulationException(
                         "Deprecated properties are being used. Either remove them or set enabledDeprecatedProperties=true",
                         new Object[0]);
             }
         }
+        session.init(manipulators);
+    }
 
-        session.initManipulators(manipulators.values());
-        CommonState cState = new CommonState(session.getUserProperties());
-        DependencyState dState = session.getState(DependencyState.class);
-        if (!dState.getDependencyOverrides().isEmpty() && cState.getStrictDependencyPluginPropertyValidation() != 0) {
-            logger.warn("Disabling strictPropertyValidation as dependencyOverrides are enabled");
-            cState.setStrictDependencyPluginPropertyValidation(0);
+    public ManipulationSession getSession() {
+        return sessions.iterator().next();
+    }
+
+    class Pipeline {
+
+        final Try<ManipulationSession> sessionTry;
+
+        Pipeline(ManipulationSession thatSession) {
+            sessionTry = Try.success(thatSession);
         }
 
-        session.setState(cState);
+        Try<ManipulationSession> call() {
+            Predicate<ManipulationSession> isWritingChange = this::isWritingChange;
+            Predicate<ManipulationSession> isNotCached = this::isNotCached;
+
+            return sessionTry.flatMap(session -> 
+                this.isEnabled(session) 
+                    ? Try.success(session)
+                          .andThenTry(this::handleConfigPrecedence)
+                          .andThenTry(this::init)
+                          .andThenTry(this::scanAndApply)
+                    : Try.success(null)
+            );
+        }
+
+        boolean isEnabled(ManipulationSession session) {
+            if (!session.isEnabled()) {
+                logger.info("Manipulation engine disabled via command-line option");
+                return false;
+            }
+            return true;
+        }
+
+        boolean isWritingChange(ManipulationSession manipulationSession) {
+            return Optional.of(manipulationSession)
+                    .map(ManipulationSession::getUserProperties)
+                    .map(properties -> properties.getProperty(REWRITE_CHANGED, "true"))
+                    .map(Boolean::valueOf)
+                    .orElseThrow()
+                    .booleanValue();
+        }
+
+        boolean isNotCached(ManipulationSession manipulationSession) {
+            return Optional.ofNullable(manipulationSession.getMavenSession())
+                           .map(MavenSession::getRequest)
+                           .map(MavenExecutionRequest::getPom)
+                           .map(pomFile -> new File(pomFile, ManipulationManager.MARKER_FILE))
+                           .map(File::exists)
+                           .orElse(Boolean.TRUE)
+                           .booleanValue();
+        }
+
+        ManipulationSession handleConfigPrecedence(ManipulationSession manipulationSession) {
+            final MavenSession mavenSession = manipulationSession.getMavenSession();
+            final File pomFile = mavenSession.getRequest().getPom();
+            if (pomFile == null) {
+                thrower.accept(new NoSuchFileException("Manipulation cannot locate request POM file"));
+            }
+            Properties config = Try.of(() -> configIO.parse(pomFile.getParentFile())).get();
+            PropertiesUtils.handleConfigPrecedence(manipulationSession.getUserProperties(), config);
+            return manipulationSession;
+        }
+
+        void init(ManipulationSession session) throws ManipulationException {
+            ManipulationManager.this.init(session);
+        }
+
+        void scanAndApply(ManipulationSession manipulationSession) throws ManipulationException {
+            logger.info("Running Maven Manipulation Extension (PME) "
+                    + ManifestUtils.getManifestInformation(ManipulationManager.class));
+
+            ManipulationManager.this.scanAndApply(manipulationSession);
+        }
+    }
+    
+    final Consumer<Throwable> thrower = CheckedConsumer.<Throwable>of(cause -> { throw cause; }).unchecked();
+
+    public void scanAndApply( ) {
+        scanAndApply( getSession().getMavenSession() );
+    }
+
+    public void scanAndApply(MavenSession mavenSession) {
+       sessions.stream()
+                .peek(session -> session.inject(mavenSession)) // update maven session (required by m2e)
+                .map(session -> {
+                    return new Pipeline(session); // run the modification pipeline
+                })
+                .map(Pipeline::call)
+                .filter(Try::isFailure) // accumulate the errors and throw
+                .map(Try::getCause) 
+                .reduce((a,b) -> { a.addSuppressed(b); return a; })
+                .ifPresent(thrower);
     }
 
     /**
@@ -188,30 +297,29 @@ public class ManipulationManager {
                                                                                            .filter(Project::isExecutionRoot)
                                                                                            .findFirst()
                                                                                            .get());
-        if (!Boolean.parseBoolean(session.getUserProperties().getProperty("manipulationWriteChanged", "true"))) {
+
+        if (!isWriteChanged.apply(session)) {
             pomIO.writeTemporaryPOMs(changed);
             mavenBridge.addMojo(newExecutionRoot.getModel());
         } else {
             logger.debug("Maven-Manipulation-Extension: Rewrite changed");
             pomIO.writePOMs(changed);
-
-            try {
-                new File(session.getTargetDir().getParentFile(), MARKER_FILE).createNewFile();
-            } catch (IOException error) {
-                logger.error("Unable to create marker file", error);
-                throw new ManipulationException("Marker file creation failed", error);
-            }
+        }
+        try {
+            new File(session.getTargetDir().getParentFile(), MARKER_FILE).createNewFile();
+        } catch (IOException error) {
+            logger.error("Unable to create marker file", error);
+            throw new ManipulationException("Marker file creation failed", error);
         }
 
         jsonReport.getGav().setPVR(newExecutionRoot.getKey());
         jsonReport.getGav()
-                       .setOriginalGAV(session.getPreviousReport()
-                                              .map(reportx -> reportx.getGav().getOriginalGAV())
-                                              .orElseGet(() -> originalExecutionRoot.getKey().toString()));
+                  .setOriginalGAV(session.getPreviousReport()
+                                         .map(reportx -> reportx.getGav().getOriginalGAV())
+                                         .orElseGet(() -> originalExecutionRoot.getKey().toString()));
         WildcardMap<ProjectVersionRef> map = session.getState(RelocationState.class) == null ? new WildcardMap<>()
                 : session.getState(RelocationState.class).getDependencyRelocations();
-        String report = ProjectComparator.compareProjects(session, jsonReport, map, originalProjects,
-                currentProjects);
+        String report = ProjectComparator.compareProjects(session, jsonReport, map, originalProjects, currentProjects);
         logger.info("{}{}", System.lineSeparator(), report);
         String reportTxtOutputFile = session.getUserProperties().getProperty("reportTxtOutputFile", "");
 
@@ -234,8 +342,8 @@ public class ManipulationManager {
             throw new ManipulationException("Marker/result file creation failed", cause);
         }
 
-        if (!Boolean.parseBoolean(session.getUserProperties().getProperty("manipulationWriteChanged", "true"))) {
-            mavenBridge.addReport(session.getSession(), newExecutionRoot.getModel(), jsonReport);
+        if (!isWriteChanged.apply(session)) {
+            mavenBridge.addReport(session.getMavenSession(), newExecutionRoot.getModel(), jsonReport);
         }
 
         logger.info("Maven-Manipulation-Extension: Finished.");
@@ -245,7 +353,7 @@ public class ManipulationManager {
     private Set<String> parseActiveProfiles(ManipulationSession session, List<Project> projects)
             throws ManipulationException {
         final Set<String> activeProfiles = new HashSet<>();
-        final DefaultProfileManager dpm = new DefaultProfileManager(session.getSession().getContainer(),
+        final DefaultProfileManager dpm = new DefaultProfileManager(session.getMavenSession().getContainer(),
                 session.getUserProperties());
 
         logger.debug("Explicitly activating {}", session.getActiveProfiles());

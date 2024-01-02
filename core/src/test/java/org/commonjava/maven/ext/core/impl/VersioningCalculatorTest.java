@@ -31,10 +31,10 @@ import org.apache.maven.model.Model;
 import org.apache.maven.repository.DefaultMirrorSelector;
 import org.codehaus.plexus.DefaultPlexusContainer;
 import org.codehaus.plexus.PlexusContainer;
-import org.commonjava.maven.atlas.ident.ref.ProjectRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectVersionRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.core.ManipulationSession;
@@ -43,7 +43,7 @@ import org.commonjava.maven.ext.core.fixture.TestUtils;
 import org.commonjava.maven.ext.core.state.VersioningState;
 import org.commonjava.maven.ext.io.resolver.GalleyAPIWrapper;
 import org.commonjava.maven.ext.io.resolver.GalleyInfrastructure;
-import org.commonjava.maven.ext.io.resolver.MavenLocationExpander;
+import org.commonjava.maven.ext.io.resolver.GalleyMavenLocationExpander;
 import org.commonjava.maven.ext.io.rest.handler.AddSuffixJettyHandler;
 import org.commonjava.maven.galley.model.Location;
 import org.commonjava.maven.galley.spi.transport.Transport;
@@ -1308,7 +1308,7 @@ public class VersioningCalculatorTest
             }
         }
 
-        final Location mdLoc = MavenLocationExpander.EXPANSION_TARGET;
+        final Location mdLoc = GalleyMavenLocationExpander.EXPANSION_TARGET;
         final Transport mdTrans = new StubTransport( dataMap );
 
         modder =

@@ -16,8 +16,8 @@
 package org.commonjava.maven.ext.core;
 
 import java.io.File;
+import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -25,29 +25,36 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 
+import javax.annotation.PostConstruct;
+import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Settings;
 import org.codehaus.plexus.logging.Logger;
 import org.commonjava.maven.ext.annotation.ConfigValue;
+import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.session.MavenSessionHandler;
-import org.commonjava.maven.ext.common.util.ManifestUtils;
+import org.commonjava.maven.ext.core.bridge.ManipulatingExtensionBridge;
 import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.state.CommonState;
+import org.commonjava.maven.ext.core.state.DependencyState;
 import org.commonjava.maven.ext.core.state.State;
 import org.commonjava.maven.ext.core.state.VersioningState;
 import org.commonjava.maven.ext.core.util.ManipulatorPriorityComparator;
-import org.commonjava.maven.ext.io.resolver.MavenEventSpy;
+import org.commonjava.maven.ext.io.ConfigIO;
 
+import io.vavr.control.Try;
 import lombok.Getter;
 
 /**
@@ -57,36 +64,61 @@ import lombok.Getter;
  *
  * @author jdcasey
  */
-@Named
+@Named(ManipulationComponent.HINT)
 @Singleton
-public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.MavenSessionInjector {
+@SessionScoped
+public class ManipulationSession implements MavenSessionHandler, ManipulationComponent {
     @ConfigValue(docIndex = "../index.html#disabling-the-extension")
     private static final String MANIPULATIONS_DISABLED_PROP = "manipulation.disable";
 
     private final Map<Class<?>, State> states = new HashMap<>();
 
-    @Inject private ManipulatingExtensionBridge mojoBridge;
+    @Inject
+    private ManipulatingExtensionBridge mojoBridge;
 
-    @Inject private Logger logger;
+    @Inject
+    private Logger logger;
+
+    @Inject
+    private MavenSession mavenSession;
+
+    @Inject
+    private ConfigIO configIO;
+
+    public ManipulationSession() { // should exist for guice instrumentation
+        super();
+    }
+
+    /**
+     * @return Returns the current MavenSession
+     */
+    public MavenSession getMavenSession() {
+        return mavenSession;
+    }
+
+    ManipulationSession inject(MavenSession mavenSession) { // m2e, don't have the invoked session injected
+        this.mavenSession = mavenSession;
+        return this;
+    }
 
     /**
      * Determined from {@link Manipulator#getExecutionIndex()} comparisons during
-     * {@link ManipulationManager#init(ManipulationSession)}.
+     * {@link #injectManipulators(Set<Manipulator)}.
      *
      * @return the ordered manipulators
      */
     @Getter
     List<Manipulator> manipulators = Collections.emptyList();
 
+    void init(Set<Manipulator> manipulators) throws ManipulationException {
+        injectManipulatorsAndComputeStates(manipulators);
+        computeCommonState();
+        readPreviousReport();
+    }
 
-    /**
-     * manager delegate which initialize the manipulators for the session
-     * {@link ManipulationManager#init(ManipulationSession)}.
-     *
-     */
-    void initManipulators(Collection<Manipulator> manipulators) throws ManipulationException {
-        List<Manipulator> orderedManipulators
-                = new ArrayList<>(manipulators);
+    private void injectManipulatorsAndComputeStates(Set<Manipulator> manipulators) throws ManipulationException {
+        // inject ordered manipulators and compute states
+        List<Manipulator> orderedManipulators = new ArrayList<>(manipulators);
 
         // The RESTState depends upon the VersionState being initialised. Therefore
         // initialise in reverse order
@@ -96,18 +128,36 @@ public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.M
         orderedManipulators.sort(Collections.reverseOrder(new ManipulatorPriorityComparator()));
 
         for (final Manipulator manipulator : orderedManipulators) {
-            logger.debug("Initialising manipulator " + manipulator.getClass()
-                    .getSimpleName());
+            logger.debug("Initialising manipulator " + manipulator.getClass().getSimpleName());
             manipulator.init(this);
         }
         orderedManipulators.sort(new ManipulatorPriorityComparator());
-        
+
         this.manipulators = orderedManipulators;
     }
 
-    private MavenSession mavenSession;
+    private void computeCommonState() throws ManipulationException {
+        CommonState cState = new CommonState(getUserProperties());
+        DependencyState dState = getState(DependencyState.class);
+        if (!dState.getDependencyOverrides().isEmpty() && cState.getStrictDependencyPluginPropertyValidation() != 0) {
+            logger.warn("Disabling strictPropertyValidation as dependencyOverrides are enabled");
+            cState.setStrictDependencyPluginPropertyValidation(0);
+        }
+        setState(cState);
+    }
 
     private Optional<PME> previousReport;
+
+    void readPreviousReport() {
+        previousReport = mojoBridge.readReport(mavenSession);
+    }
+
+    /**
+     * @return the previous manipulation report if anyx
+     */
+    Optional<PME> getPreviousReport() {
+        return previousReport;
+    }
 
     /**
      * List of <code>Project</code> instances.
@@ -150,12 +200,6 @@ public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.M
 
     public void setMavenSession(final MavenSession mavenSession) {
         this.mavenSession = mavenSession;
-        this.previousReport = mojoBridge.readReport(mavenSession);
-    }
-    
-    @Override
-    public void inject(final MavenSession mavenSession) {
-        setMavenSession(mavenSession);
     }
 
     @Override
@@ -169,11 +213,8 @@ public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.M
 
         @Override
         public String getProperty(String key) {
-            if (mavenSession == null) {
-                return null;
-            }
             return Optional.ofNullable(userProperties().getProperty(key))
-                           .orElse(activeProfilesProperties().getProperty(key));
+                           .orElseGet(() -> activeProfilesProperties().getProperty(key));
         }
 
         Properties userProperties() {
@@ -192,6 +233,19 @@ public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.M
                                        (props1, props2) -> {
                                        });
         }
+
+        Properties loadParentProperties() {
+            ManipulationSession manipulationSession = ManipulationSession.this;
+            return Optional.of(manipulationSession.getMavenSession())
+                                              .map(MavenSession::getRequest)
+                                              .map(MavenExecutionRequest::getPom)
+                                              .map(File::getParentFile)
+                                              .map(pomFile -> Try.success(pomFile)
+                                                                 .mapTry(manipulationSession.configIO::parse)
+                                                                 .get())
+                                              .get();
+        }
+
     };
 
     final UserProperties userProperties = new UserProperties();
@@ -294,20 +348,6 @@ public class ManipulationSession implements MavenSessionHandler, MavenEventSpy.M
             return getState(CommonState.class).getExcludedScopes();
         }
         return Collections.emptyList();
-    }
-
-    /**
-     * @return Returns the current MavenSession
-     */
-    MavenSession getSession() {
-        return mavenSession;
-    }
-
-    /**
-     * @return the previous manipulation report if anyx
-     */
-    Optional<PME> getPreviousReport() {
-        return previousReport;
     }
 
 }

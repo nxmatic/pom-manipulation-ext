@@ -15,18 +15,22 @@
  */
 package org.commonjava.maven.ext.common.json;
 
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectVersionRef;
+
 /*
  * Created by JacksonGenerator on 23/07/2019.
  */
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import lombok.Getter;
 import lombok.Setter;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectVersionRef;
+import lombok.ToString;
 
 @Getter
 @Setter
+@ToString(includeFieldNames = true)
 public class GAV
 {
     /**

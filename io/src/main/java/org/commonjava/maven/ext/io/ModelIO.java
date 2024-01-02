@@ -15,34 +15,15 @@
  */
 package org.commonjava.maven.ext.io;
 
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.Plugin;
-import org.apache.maven.model.PluginExecution;
-import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
-import org.codehaus.plexus.util.xml.Xpp3Dom;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.commonjava.maven.atlas.ident.ref.ArtifactRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectRef;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.io.resolver.GalleyAPIWrapper;
-import org.commonjava.maven.galley.TransferException;
-import org.commonjava.maven.galley.maven.GalleyMavenException;
-import org.commonjava.maven.galley.maven.model.view.DependencyView;
-import org.commonjava.maven.galley.maven.model.view.MavenPomView;
-import org.commonjava.maven.galley.maven.model.view.PluginView;
-import org.commonjava.maven.galley.model.Transfer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.commons.lang.StringUtils.isEmpty;
+import static org.apache.commons.lang.StringUtils.startsWith;
 
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.MessageFormat;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -54,23 +35,56 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.apache.commons.lang.StringUtils.isEmpty;
-import static org.apache.commons.lang.StringUtils.isNotEmpty;
-import static org.apache.commons.lang.StringUtils.startsWith;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.model.PluginExecution;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
+import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.io.resolver.GalleyAPIWrapper;
+import org.commonjava.maven.galley.TransferException;
+import org.commonjava.maven.galley.maven.GalleyMavenException;
+import org.commonjava.maven.galley.maven.model.view.DependencyView;
+import org.commonjava.maven.galley.maven.model.view.MavenPomView;
+import org.commonjava.maven.galley.maven.model.view.PluginView;
+import org.commonjava.maven.galley.model.Transfer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.vavr.CheckedRunnable;
+import io.vavr.control.Try;
 
 /**
  * Class to resolve artifact descriptors (pom files) from a maven repository
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class ModelIO {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private final GalleyAPIWrapper galleyWrapper;
-
     @Inject
+    private Collection<GalleyAPIWrapper> galleyWrapperSingleton;
+
+    ModelIO() {
+        super();
+    }
+
     public ModelIO(GalleyAPIWrapper galleyWrapper) {
-        this.galleyWrapper = galleyWrapper;
+        this.galleyWrapperSingleton = Collections.singleton(galleyWrapper);
+    }
+
+    private GalleyAPIWrapper galleyWrapper() {
+        return galleyWrapperSingleton.iterator().next();
     }
 
     /**
@@ -83,54 +97,21 @@ public class ModelIO {
     public Model resolveRawModel(final ProjectVersionRef ref) throws ManipulationException {
         Transfer transfer;
         try {
-            transfer = galleyWrapper.resolveArtifact(ref.asPomArtifact());
+            transfer = galleyWrapper().resolveArtifact(ref.asPomArtifact());
             if (transfer == null) {
                 throw new ManipulationException("Failed to resolve POM: {}", ref.asPomArtifact());
             }
         } catch (final TransferException e) {
             throw new ManipulationException("Failed to resolve POM ({}) : ", ref, e.getMessage(), e);
         }
-    
-        class TransferOpener {
-    
-            class TracingCloserInputStream extends InputStream {
-    
-                final InputStream delegate;
-    
-                public TracingCloserInputStream(InputStream input) {
-                    this.delegate = input;
-                }
-    
-                @Override
-                public int read() throws IOException {
-                    return delegate.read();
-                }
-    
-                // Override other methods as needed, delegating to the original stream
-    
-                @Override
-                public void close() throws IOException {
-                    logger.debug("Closing transfer stream of {}", transfer.getLocation().getUri(), new Throwable("call stack"));
-                    delegate.close();
-                }
-            }
-    
-            public InputStream openInputStream() throws IOException {
-                return Optional.ofNullable(transfer.openInputStream())
-                               .map(TracingCloserInputStream::new)
-                               .orElseThrow(() -> new IOException(String.format(
-                                       "Cannot open transfer input stream transfer from ", transfer.getResource())));
-            };
-        }
-        ;
-    
-        try (InputStream in = new TransferOpener().openInputStream()) {
+        try (InputStream in = transfer.openInputStream()) {
             return new MavenXpp3Reader().read(in);
         } catch (final IOException | XmlPullParserException e) {
             throw new ManipulationException("Failed to build model for POM ({}) : ", ref, e.getMessage(), e);
         }
     }
 
+ 
     /**
      * Read the raw file from a given GAVTC (GAV + Type and Classifier). Useful if we need to read a remote file.
      *
@@ -141,7 +122,7 @@ public class ModelIO {
     public File resolveRawFile(final ArtifactRef ref) throws ManipulationException {
         Transfer transfer;
         try {
-            transfer = galleyWrapper.resolveArtifact(ref);
+            transfer = galleyWrapper().resolveArtifact(ref);
         } catch (final TransferException e) {
             throw new ManipulationException("Failed to resolve POM ({}) : {}", ref, e.getMessage(), e);
         }
@@ -158,7 +139,7 @@ public class ModelIO {
 
         final Map<ArtifactRef, String> versionOverrides = new LinkedHashMap<>();
         try {
-            final MavenPomView pomView = galleyWrapper.readPomView(ref);
+            final MavenPomView pomView = galleyWrapper().readPomView(ref);
 
             // TODO: active profiles!
             final List<DependencyView> deps = pomView.getAllManagedDependencies();
@@ -217,7 +198,7 @@ public class ModelIO {
         final Model m = resolveRawModel(ref);
 
         try {
-            final MavenPomView pomView = galleyWrapper.readPomView(ref);
+            final MavenPomView pomView = galleyWrapper().readPomView(ref);
             final List<PluginView> deps = pomView.getAllManagedBuildPlugins();
             for (final PluginView p : deps) {
                 pluginOverridesPomView.put(p.asProjectRef(), p.asProjectVersionRef());
@@ -347,4 +328,51 @@ public class ModelIO {
         }
         return result;
     }
+    
+    class Module {
+        
+        class TransferTracingOpener {
+            
+            final Transfer transfer;
+            
+            public TransferTracingOpener(Transfer transfer) {
+                this.transfer = transfer;
+            }
+
+            class TracingCloserInputStream extends InputStream {
+
+                final Optional<InputStream> delegate;
+
+                public TracingCloserInputStream(InputStream input) {
+                    this.delegate = Optional.ofNullable(input);
+                }
+
+                @Override
+                public int read() throws IOException {
+                    return delegate.orElseThrow(null).read();
+                }
+
+                // Override other methods as needed, delegating to the original stream
+
+                @Override
+                public void close() throws IOException {
+                    delegate.stream()
+                            .peek(__ -> logger.debug("Closing transfer stream of {}", transfer.getDetachedFile().getPath(),
+                                    new Throwable("call stack")))
+                            .forEach(input -> CheckedRunnable.of(input::close).unchecked());
+                }
+            }
+
+            public InputStream openInputStream() throws IOException {
+                return Try.ofCallable(transfer::openInputStream)
+                          .map(TracingCloserInputStream::new) // wrap the input for tracing the closing
+                          .getOrElseThrow(cause -> new IOException(MessageFormat.format(
+                                  "Cannot open transfer input stream transfer from {}", transfer.getResource()), cause));
+            }
+
+        }
+
+    }
+
 }
+

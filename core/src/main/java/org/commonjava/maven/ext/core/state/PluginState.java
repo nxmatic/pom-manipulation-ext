@@ -15,14 +15,7 @@
  */
 package org.commonjava.maven.ext.core.state;
 
-import lombok.Getter;
-import org.apache.maven.model.Plugin;
-import org.commonjava.maven.atlas.ident.ref.ArtifactRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.ext.annotation.ConfigValue;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.core.impl.PluginManipulator;
-import org.commonjava.maven.ext.core.util.IdUtils;
+import static org.commonjava.maven.ext.core.util.PropertiesUtils.getPropertiesByPrefix;
 
 import java.util.HashSet;
 import java.util.List;
@@ -30,8 +23,17 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import static org.commonjava.maven.ext.core.util.PropertiesUtils.getPropertiesByPrefix;
+import org.apache.maven.model.Plugin;
+import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.maven.ext.annotation.ConfigValue;
+import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.core.impl.PluginManipulator;
+import org.commonjava.maven.ext.core.util.IdUtils;
+
+import lombok.Getter;
 
 /**
  * Captures configuration relating to plugin alignment from the POMs. Used by {@link PluginManipulator}.
@@ -199,6 +201,10 @@ public class PluginState
         }
     }
 
+    public Set<ProjectVersionRef> getRemotePluginRefs() {
+        return remotePluginMgmt.stream().collect(Collectors.toSet());
+    }
+    
     public Set<Plugin> getRemoteRESTOverrides( )
     {
         return remoteRESTplugins;

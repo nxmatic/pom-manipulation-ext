@@ -17,6 +17,7 @@ package org.commonjava.maven.ext.common.session;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.settings.Settings;
+import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.ext.common.ManipulationException;
 
 import java.io.File;

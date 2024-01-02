@@ -19,25 +19,35 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
@@ -54,7 +64,7 @@ import org.apache.maven.shared.release.transform.ModelETLRequest;
 import org.apache.maven.shared.release.transform.jdom2.JDomModelETL;
 import org.apache.maven.shared.release.transform.jdom2.JDomModelETLFactory;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.jdom.JDOMModelConverter;
 import org.commonjava.maven.ext.common.model.Project;
@@ -73,10 +83,10 @@ import io.vavr.control.Try;
  *
  * @author jdcasey
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class PomIO {
-    // TODO: Remove this if no side affects reported in 2022.
+    //
     public static final String PARSE_POM_TEMPLATES = "parsePomTemplates";
 
     private static final String MODIFIED_BY = "Modified by POM Manipulation Extension for Maven";
@@ -89,21 +99,25 @@ public class PomIO {
 
     private final JDOMModelConverter jdomModelConverter = new JDOMModelConverter();
 
-    private final boolean parsePomTemplates;
-
     private final String manifestComment = buildManifestComment();
 
-    protected final BiFunction<File, Path, File> pomResolver = (source,
-            other) -> source.toPath().resolveSibling(other).toFile();
-
     @Inject
-    public PomIO(MavenSessionHandler handler) {
-        parsePomTemplates = Boolean.parseBoolean(handler.getUserProperties().getProperty(PARSE_POM_TEMPLATES, "true"));
+    private Collection<MavenSessionHandler> handlerSingleton;
+
+    private boolean parsePomTemplates() {
+        if (handlerSingleton.isEmpty()) {
+            return true;
+        }
+        return Boolean.parseBoolean(
+                handlerSingleton.iterator().next().getUserProperties().getProperty(PARSE_POM_TEMPLATES, "true"));
     }
 
-    // Test use only.
     public PomIO() {
-        parsePomTemplates = true;
+        handlerSingleton = Collections.emptySet();
+    }
+
+    public PomIO(MavenSessionHandler handler) { // for test usage
+        handlerSingleton = Collections.singleton(handler);
     }
 
     public List<Project> parseProject(final File pom) throws ManipulationException {
@@ -188,7 +202,8 @@ public class PomIO {
                 return p;
             }
         }
-        // If the PVR refers to something outside of the hierarchy we'll break the inheritance here.
+        // If the PVR refers to something outside of the hierarchy we'll break the
+        // inheritance here.
         return null;
     }
 
@@ -201,7 +216,102 @@ public class PomIO {
      */
     public void writeTemporaryPOMs(final Set<Project> changed) throws ManipulationException {
         Path newPath = Path.of("pom-manipulation-ext.xml");
-        writeTemporaryPOMs(changed, originalFile -> pomResolver.apply(originalFile, newPath));
+        writeTemporaryPOMs(changed, originalFile -> pomResolver.andThen(temporaryPomFileProvider::deleteOnDispose)
+                                                               .apply(originalFile, newPath));
+    }
+
+    @PreDestroy
+    void deleteTemporaryFilesOnDispose() {
+        temporaryPomFileProvider.dispose();
+    }
+
+    protected final BiFunction<File, Path, File> pomResolver = (source,
+            other) -> source.toPath().resolveSibling(other).toFile();
+
+    private TemporaryPomFileProvider temporaryPomFileProvider = new TemporaryPomFileProvider();
+
+    public File createTemporaryPOMDumpFile() {
+        return temporaryPomFileProvider.get();
+    }
+
+    protected class TemporaryPomFileProvider implements Provider<File> {
+
+        final Set<File> files = new HashSet<>();
+
+        protected String suffix;
+
+        public TemporaryPomFileProvider() {
+            suffix = suffixOf(this.getClass()).orElse("pom-manipulation-extension-temporary-pom.xml");
+        }
+
+        public File get() {
+            return Try.ofCallable(this::createPomDumpFile).get();
+        }
+
+        protected File createPomDumpFile() throws IOException {
+            File tmpFile = File.createTempFile("pom-", suffix);
+            deleteOnDispose(tmpFile);
+            return tmpFile;
+        }
+
+        protected File deleteOnDispose(File file) {
+            if (files.contains(file)) { // for debugging duplicates
+                return file;
+            }
+            files.add(file);
+            return file;
+        }
+
+        void dispose() {
+            files.forEach(File::delete);
+        }
+
+        Optional<String> suffixOf(Class<?> clazz) {
+            return Try.ofCallable(() -> suffixOfChecked(clazz)).get();
+        }
+
+        Optional<String> suffixOfChecked(Class<?> clazz) throws IOException {
+            // Get the class loader
+            ClassLoader classLoader = clazz.getClassLoader();
+
+            // Get the URL of the class file
+            String className = clazz.getName().replace('.', '/') + ".class";
+            URL classUrl = classLoader.getResource(className);
+
+            // Check if the class is in a JAR file
+            if (classUrl == null || classUrl.getProtocol().equals("jar")) {
+                return Optional.empty();
+            }
+            // Get the path of the JAR file
+            String jarPath = classUrl.getPath().substring(5, classUrl.getPath().indexOf('!'));
+
+            // Open the JAR file
+            try (JarFile jarFile = new JarFile(jarPath)) {
+                // Get all entries in the JAR file
+                Enumeration<JarEntry> entries = jarFile.entries();
+
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+
+                    // Check if the entry is a pom.properties file
+                    if (entry.getName().endsWith("pom.properties")) {
+                        // Open the entry and load the properties
+                        try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                            Properties properties = new Properties();
+                            properties.load(inputStream);
+
+                            // Get the GAV
+                            String groupId = properties.getProperty("groupId");
+                            String artifactId = properties.getProperty("artifactId");
+                            String version = properties.getProperty("version");
+
+                            return Optional.of(artifactId + "-" + version + "-" + suffix);
+                        }
+                    }
+                }
+            }
+            return Optional.empty();
+        }
     }
 
     /**
@@ -212,36 +322,89 @@ public class PomIO {
      * @param resolver the modified POM path resolver.
      * @throws ManipulationException if an error occurs.
      */
-    public void writeTemporaryPOMs(final Set<Project> changed, Function<File, File> pomResolver)
+    public void writeTemporaryPOMs(final Set<Project> changed, Function<File, File> withTemporaryPomFile)
             throws ManipulationException {
+
         writePOMs(changed, project -> Try.ofCallable(() -> {
             File originalPom = project.getPom();
-            File manipulatedPom = pomResolver.apply(originalPom);
+            File manipulatedPom = withTemporaryPomFile.apply(originalPom);
 
-            // relocate parents in modules
-            Predicate<Project> isInheritanceRoot = Project::isInheritanceRoot;
-            Stream.of(project)
-                  .filter(isInheritanceRoot.negate())
-                  .map(Project::getModel)
-                  .map(Model::getParent)
-                  .forEach(parent -> {
-                      File originalParentPom = pomResolver.apply(Paths.get(parent.getRelativePath()).toFile());
-                      File manipulatedParentPom = pomResolver.apply(originalParentPom);
+            temporaryPOMsrelocate(project, withTemporaryPomFile);
 
-                      parent.setRelativePath(manipulatedParentPom.getPath());
-                  });
-
-            Function<File, File> toPomFile = file -> file.isDirectory() ? new File(file, "pom.xml") : file;
-            Stream.of(project)
-                  .map(Project::getModel)
-                  .forEach(model -> model.setModules(model.getModules()
-                                                          .stream()
-                                                          .map(File::new) // Convert the string path to a File
-                                                          .map(toPomFile.andThen(pomResolver))
-                                                          .map(File::getPath) // Convert the File back to a string path.
-                                                          .collect(Collectors.toList())));
             return manipulatedPom;
         }).get());
+    }
+
+    void temporaryPOMsrelocate(Project project, Function<File, File> withTemporaryPomFile) {
+        Arrays.stream(TemporayPOMsRelocator.INSTANCES)
+              .forEach(relocator -> relocator.relocate(project, withTemporaryPomFile));
+    }
+
+    interface TemporayPOMsRelocator {
+
+        static TemporayPOMsRelocator[] INSTANCES = { new Modules(), new Parent() };
+
+        void relocate(Project project, Function<File, File> withTemporaryPomFile);
+
+        class Modules implements TemporayPOMsRelocator {
+
+            @Override
+            public void relocate(Project project, Function<File, File> withTemporaryPomFile) {
+                Model projectModel = project.getModel();
+                List<String> projectModules = projectModel.getModules();
+
+                if (!projectModules.isEmpty()) {
+                    logger.debug("Relocating modules of {}", project);
+                    projectModel.setModules(
+                            relocate(project.getPom().getParentFile().toPath(), projectModules, withTemporaryPomFile));
+                }
+                projectModel.getProfiles().forEach(profile -> {
+                    List<String> profileModules = profile.getModules();
+                    if (!profileModules.isEmpty()) {
+                        logger.debug("Relocating modules of {} in profile {}", project, profile.getId());
+                        profile.setModules(relocate(project.getPom().getParentFile().toPath(), profileModules,
+                                withTemporaryPomFile));
+                    }
+                });
+            }
+
+            List<String> relocate(Path projectPath, List<String> modules, Function<File, File> withTemporaryPomFile) {
+                return modules.stream()
+                              .map(File::new)
+                              .map(File::toPath)
+                              .map(path -> projectPath.resolve(path).toFile().isDirectory() ? path.resolve("pom.xml")
+                                      : path)
+                              .map(Path::toFile)
+                              .map(withTemporaryPomFile)
+                              .map(File::toString)
+                              .collect(Collectors.toList());
+            }
+
+        }
+
+        class Parent implements TemporayPOMsRelocator {
+
+            @Override
+            public void relocate(Project project, Function<File, File> withTemporaryPomFile) {
+                Stream.of(project)
+                      .map(Project::getModel)
+                      .map(Model::getParent)
+                      .filter(Objects::nonNull)
+                      .forEach(parent -> {
+                          File basedir = project.getPom().getParentFile();
+                          String relativePath = parent.getRelativePath();
+                          if (!basedir.toPath().resolve(relativePath).toFile().exists()) {
+                              return;
+                          }
+
+                          File relativeFile = Paths.get(relativePath).toFile();
+                          File manipulatedRelativeFile = withTemporaryPomFile.apply(relativeFile);
+
+                          parent.setRelativePath(manipulatedRelativeFile.getPath());
+                      });
+            }
+        }
+
     }
 
     /**
@@ -272,6 +435,12 @@ public class PomIO {
 
             model.setPomFile(pomFile);
         }
+//        try {
+//            new File(session.getTargetDir().getParentFile(), MARKER_FILE).createNewFile();
+//        } catch (IOException error) {
+//            logger.error("Unable to create marker file", error);
+//            throw new ManipulationException("Marker file creation failed", error);
+//        }
     }
 
     String buildManifestComment() {
@@ -313,10 +482,12 @@ public class PomIO {
             // Reread in order to fill in JdomModelETL the original Model
             etl.extract(project.getPom());
 
-            // Annoyingly the document is private but we need to access it in order to ensure the model is written to
+            // Annoyingly the document is private but we need to access it in order to
+            // ensure the model is written to
             // the Document.
             //
-            // Currently the fields we want to access are private - https://issues.apache.org/jira/browse/MRELEASE-1044
+            // Currently the fields we want to access are private -
+            // https://issues.apache.org/jira/browse/MRELEASE-1044
             // requests
             // them to be protected to avoid this reflection.
             Document doc = (Document) FieldUtils.getDeclaredField(JDomModelETL.class, "document", true).get(etl);
@@ -324,9 +495,11 @@ public class PomIO {
             jdomModelConverter.convertModelToJDOM(model, doc);
 
             if (project.isExecutionRoot()) {
-                // Previously it was possible to add a comment outside of the root element (which
+                // Previously it was possible to add a comment outside of the root element
+                // (which
                 // maven3-model-jdom-support handled)
-                // but the release plugin code only takes account of code within the root element and everything else is
+                // but the release plugin code only takes account of code within the root
+                // element and everything else is
                 // handled separately.
                 //
                 String outtro = (String) FieldUtils.getDeclaredField(JDomModelETL.class, "outtro", true).get(etl);
@@ -376,7 +549,7 @@ public class PomIO {
                 //
                 // Effectively either parse_pom_templates [default to true] ||
                 // parse_pom_templates overridden to false so key MUST be NOT null
-                if (parsePomTemplates || peek.getKey() != null) {
+                if (parsePomTemplates() || peek.getKey() != null) {
                     peeked.add(peek);
 
                     final File dir = pom.getParentFile();

@@ -22,7 +22,7 @@ import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.codehaus.plexus.DefaultPlexusContainer;
 import org.codehaus.plexus.PlexusContainer;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.util.JSONUtils;

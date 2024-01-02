@@ -15,15 +15,6 @@
  */
 package org.commonjava.maven.ext.io;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.SystemUtils;
-import org.commonjava.maven.ext.common.util.LineSeparator;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.io.resolver.GalleyInfrastructure;
-
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -31,21 +22,34 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.UUID;
+
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.SystemUtils;
+import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.common.util.LineSeparator;
+import org.commonjava.maven.ext.io.resolver.GalleyInfrastructure;
 
 /**
  * Class to resolve Files from alternate locations
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class FileIO
 {
-    private final GalleyInfrastructure infra;
-
-    @Inject
-    public FileIO(@Named( "galley" ) GalleyInfrastructure infra )
-    {
-        this.infra = infra;
+    private Collection<GalleyInfrastructure> infraSingleton = Collections.emptySet();
+    
+    private GalleyInfrastructure infra() {
+        return infraSingleton.iterator().next();
+    }
+    
+    public void injectInfra(@Named( "galley" ) GalleyInfrastructure infra) {
+        infraSingleton = Collections.singleton(infra);
     }
 
     /**
@@ -72,7 +76,7 @@ public class FileIO
         // If its a local file reference. just use the file itself rather than copying it.
         if ( !"file".equals( ref.getProtocol() ) )
         {
-            File cache = infra.getCacheDir();
+            File cache = infra().getCacheDir();
 
             result = new File( cache, UUID.randomUUID().toString() );
 

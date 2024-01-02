@@ -15,8 +15,17 @@
  */
 package org.commonjava.maven.ext.io;
 
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.JsonPathException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
+import java.util.Properties;
+
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.commonjava.maven.ext.annotation.ConfigValue;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.model.YamlFile;
@@ -26,17 +35,10 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.representer.Representer;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Map;
-import java.util.Properties;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.JsonPathException;
 
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class ConfigIO
 {

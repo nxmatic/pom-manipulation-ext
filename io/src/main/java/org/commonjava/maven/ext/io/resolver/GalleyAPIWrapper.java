@@ -15,10 +15,10 @@
  */
 package org.commonjava.maven.ext.io.resolver;
 
-import org.commonjava.maven.atlas.ident.ref.ArtifactRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
 import org.commonjava.maven.galley.TransferException;
 import org.commonjava.maven.galley.maven.GalleyMavenException;
 import org.commonjava.maven.galley.maven.model.view.DocRef;
@@ -31,6 +31,7 @@ import org.commonjava.maven.galley.model.Transfer;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
+import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -45,15 +46,16 @@ import java.util.List;
  * 
  * @author jdcasey
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
+@SessionScoped
 public class GalleyAPIWrapper
 {
 
     private static final List<Location> MAVEN_REPOS = new ArrayList<Location>()
     {
         {
-            add( MavenLocationExpander.EXPANSION_TARGET );
+            add( GalleyMavenLocationExpander.EXPANSION_TARGET );
         }
 
         private static final long serialVersionUID = 1L;

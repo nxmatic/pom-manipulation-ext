@@ -42,8 +42,8 @@ public class MavenLocationExpanderTest
     public void emptyValues()
                     throws Exception
     {
-        final MavenLocationExpander ex =
-                        new MavenLocationExpander( null, null, null,
+        final GalleyMavenLocationExpander ex =
+                        new GalleyMavenLocationExpander( null, null, null,
                                                    null, null, null );
         assertThat( ex.expand( Collections.emptyList() ), equalTo( Collections.emptyList() ) );
     }
@@ -80,12 +80,12 @@ public class MavenLocationExpanderTest
         final Settings settings = new Settings();
         settings.addMirror( mirror );
 
-        final MavenLocationExpander ex =
-            new MavenLocationExpander( Collections.emptyList(),
+        final GalleyMavenLocationExpander ex =
+            new GalleyMavenLocationExpander( Collections.emptyList(),
                                        Collections.singletonList( remote ), local,
                                        new DefaultMirrorSelector(), settings, Collections.emptyList() );
 
-        final List<Location> result = ex.expand( MavenLocationExpander.EXPANSION_TARGET );
+        final List<Location> result = ex.expand( GalleyMavenLocationExpander.EXPANSION_TARGET );
 
         assertThat( result.size(), equalTo( 2 ) );
 
@@ -133,13 +133,13 @@ public class MavenLocationExpanderTest
         final Settings settings = new Settings();
         settings.addProfile( profile );
 
-        final MavenLocationExpander ex =
-            new MavenLocationExpander( Collections.emptyList(),
+        final GalleyMavenLocationExpander ex =
+            new GalleyMavenLocationExpander( Collections.emptyList(),
                                        Collections.emptyList(), local,
                                        new DefaultMirrorSelector(), settings,
                                        Collections.singletonList( profile.getId() ) );
 
-        final List<Location> result = ex.expand( MavenLocationExpander.EXPANSION_TARGET );
+        final List<Location> result = ex.expand( GalleyMavenLocationExpander.EXPANSION_TARGET );
 
         assertThat( result.size(), equalTo( 2 ) );
 
@@ -181,12 +181,12 @@ public class MavenLocationExpanderTest
 
         final Settings settings = new Settings();
 
-        final MavenLocationExpander ex =
-                        new MavenLocationExpander( Collections.emptyList(),
+        final GalleyMavenLocationExpander ex =
+                        new GalleyMavenLocationExpander( Collections.emptyList(),
                                                    Collections.singletonList( remote ), local,
                                                    new DefaultMirrorSelector(), settings, Collections.emptyList() );
 
-        final List<Location> result = ex.expand( MavenLocationExpander.EXPANSION_TARGET );
+        final List<Location> result = ex.expand( GalleyMavenLocationExpander.EXPANSION_TARGET );
 
         assertThat( result.size(), equalTo( 2 ) );
 

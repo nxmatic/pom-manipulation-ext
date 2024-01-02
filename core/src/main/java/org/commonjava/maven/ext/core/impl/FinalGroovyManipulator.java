@@ -45,9 +45,9 @@ public class FinalGroovyManipulator
     implements Manipulator
 {
     @Inject
-    public FinalGroovyManipulator(ModelIO modelIO, FileIO fileIO, PomIO pomIO)
+    public FinalGroovyManipulator(FileIO fileIO, PomIO pomIO)
     {
-        super( modelIO, fileIO, pomIO );
+        super( fileIO, pomIO );
     }
     /**
      * Initialize the {@link GroovyState} state holder in the {@link ManipulationSession}. This state holder detects

@@ -209,7 +209,6 @@ public final class TestUtils
 
         mavenSession.getRequest().setPom( pom );
 
-        session.setMavenSession( mavenSession );
         manipulationManager.init( session );
 
         return new SMContainer( session,  manipulationManager );

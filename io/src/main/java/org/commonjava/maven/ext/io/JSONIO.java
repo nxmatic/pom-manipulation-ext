@@ -44,7 +44,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class JSONIO
 {

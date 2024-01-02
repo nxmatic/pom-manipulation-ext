@@ -15,34 +15,37 @@
  */
 package org.commonjava.maven.ext.manip;
 
-import org.apache.maven.AbstractMavenLifecycleParticipant;
-import org.apache.maven.MavenExecutionException;
-import org.apache.maven.execution.MavenSession;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.core.ManipulationSession;
-
+import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-@Named
+import org.apache.maven.AbstractMavenLifecycleParticipant;
+import org.apache.maven.MavenExecutionException;
+import org.apache.maven.execution.MavenSession;
+import org.commonjava.maven.ext.common.ManipulationComponent;
+import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.core.ManipulationSession;
+
+@Named(ManipulationComponent.HINT)
+@SessionScoped
 @Singleton
 public class ManipulatingLifeCycleParticipant
-    extends AbstractMavenLifecycleParticipant
+    extends AbstractMavenLifecycleParticipant implements ManipulationComponent
 {
-    private ManipulationSession session;
+    private ManipulationSession manipulatingSession;
 
     @Inject
-    public ManipulatingLifeCycleParticipant(ManipulationSession session)
+    public ManipulatingLifeCycleParticipant(ManipulationSession manipulatingSession)
     {
-        this.session = session;
+        this.manipulatingSession = manipulatingSession;
     }
 
     @Override
     public void afterProjectsRead( final MavenSession mavenSession )
         throws MavenExecutionException
     {
-        final ManipulationException error = session.getError();
+        final ManipulationException error = manipulatingSession.getError();
         if ( error != null )
         {
             throw new MavenExecutionException( "POM Manipulation failed: " + error.getMessage(), error );

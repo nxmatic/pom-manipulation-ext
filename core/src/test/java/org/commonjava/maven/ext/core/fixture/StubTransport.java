@@ -15,7 +15,7 @@
  */
 package org.commonjava.maven.ext.core.fixture;
 
-import org.commonjava.maven.ext.io.resolver.MavenLocationExpander;
+import org.commonjava.maven.ext.io.resolver.GalleyMavenLocationExpander;
 import org.commonjava.maven.galley.TransferException;
 import org.commonjava.maven.galley.event.EventMetadata;
 import org.commonjava.maven.galley.model.ConcreteResource;
@@ -118,7 +118,7 @@ public class StubTransport
     @Override
     public boolean handles( final Location loc )
     {
-        return loc.equals( MavenLocationExpander.EXPANSION_TARGET );
+        return loc.equals( GalleyMavenLocationExpander.EXPANSION_TARGET );
     }
 
     @Override

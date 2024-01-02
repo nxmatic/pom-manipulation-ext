@@ -15,34 +15,8 @@
  */
 package org.commonjava.maven.ext.core.impl;
 
-import org.apache.maven.model.Build;
-import org.apache.maven.model.Dependency;
-import org.apache.maven.model.Model;
-import org.apache.maven.model.Plugin;
-import org.apache.maven.model.PluginExecution;
-import org.apache.maven.model.PluginManagement;
-import org.apache.maven.model.Profile;
-import org.codehaus.plexus.util.xml.Xpp3Dom;
-import org.codehaus.plexus.util.xml.Xpp3DomUtils;
-import org.commonjava.maven.atlas.ident.ref.ArtifactRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.common.model.ArtifactPluginWrapper;
-import org.commonjava.maven.ext.common.model.Project;
-import org.commonjava.maven.ext.common.util.WildcardMap;
-import org.commonjava.maven.ext.core.ManipulationSession;
-import org.commonjava.maven.ext.core.state.CommonState;
-import org.commonjava.maven.ext.core.state.PluginState;
-import org.commonjava.maven.ext.core.state.PluginState.PluginPrecedence;
-import org.commonjava.maven.ext.core.state.PluginState.Precedence;
-import org.commonjava.maven.ext.core.state.RESTState;
-import org.commonjava.maven.ext.core.util.PropertiesUtils;
-import org.commonjava.maven.ext.core.util.PropertyMapper;
-import org.commonjava.maven.ext.io.ModelIO;
-
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
+import static org.apache.commons.lang.StringUtils.startsWith;
+import static org.commonjava.maven.ext.core.util.IdUtils.ga;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,9 +30,38 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import static org.apache.commons.lang.StringUtils.startsWith;
-import static org.commonjava.maven.ext.core.util.IdUtils.ga;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+import org.apache.maven.model.Build;
+import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.model.PluginExecution;
+import org.apache.maven.model.PluginManagement;
+import org.apache.maven.model.Profile;
+import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.codehaus.plexus.util.xml.Xpp3DomUtils;
+import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectVersionRef;
+import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.common.model.ArtifactPluginWrapper;
+import org.commonjava.maven.ext.common.model.Project;
+import org.commonjava.maven.ext.common.util.WildcardMap;
+import org.commonjava.maven.ext.core.ManipulationSession;
+import org.commonjava.maven.ext.core.state.CommonState;
+import org.commonjava.maven.ext.core.state.PluginState;
+import org.commonjava.maven.ext.core.state.PluginState.PluginPrecedence;
+import org.commonjava.maven.ext.core.state.PluginState.Precedence;
+import org.commonjava.maven.ext.core.state.RESTState;
+import org.commonjava.maven.ext.core.util.IdUtils;
+import org.commonjava.maven.ext.core.util.PropertiesUtils;
+import org.commonjava.maven.ext.core.util.PropertyMapper;
+import org.commonjava.maven.ext.io.ModelIO;
 
 /**
  * {@link Manipulator} implementation that can alter plugin sections in a project's pom file.
@@ -124,26 +127,27 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
     {
         final PluginState state = session.getState( PluginState.class );
         final CommonState cState = session.getState( CommonState.class );
+        final Set<ProjectVersionRef> gavs = loadMgmtGAVs();
+        final Set<Plugin> mgmtOverrides = loadMgmtOverrides(gavs);
 
-        if ( !session.isEnabled() || !state.isEnabled() )
+        if ( !session.isEnabled() || !state.isEnabled()
+                || ( mgmtOverrides.isEmpty() && state.getPluginOverride().isEmpty() ) )
         {
             logger.debug( getClass().getSimpleName() + ": Nothing to do!" );
             return Collections.emptySet();
         }
 
         final Set<Project> changed = new HashSet<>();
-        final Set<Plugin> mgmtOverrides = loadRemoteBOM();
 
-        for ( final Project project : projects )
-        {
+        for (final Project project : projects) {
+            if ( gavs.contains(SimpleProjectVersionRef.parse( IdUtils.gav(project) ) ) ) {
+                continue;
+            }
             final Model model = project.getModel();
 
-            if (!mgmtOverrides.isEmpty() || !state.getPluginOverride().isEmpty())
-            {
-                apply( project, model, mgmtOverrides );
+            apply(project, model, mgmtOverrides);
 
-                changed.add( project );
-            }
+            changed.add(project);
         }
         // If we've changed something now update any old properties with the new values.
         if ( !changed.isEmpty() )
@@ -195,15 +199,19 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
         return changed;
     }
 
+    private Set<ProjectVersionRef> loadMgmtGAVs() {
+        final PluginState pState = session.getState( PluginState.class );
+        return pState.getRemotePluginMgmt().stream().collect(Collectors.toSet());
+    }
 
-    private Set<Plugin> loadRemoteBOM()
+
+    private Set<Plugin> loadMgmtOverrides(Set<ProjectVersionRef> gavs)
         throws ManipulationException
     {
         final RESTState rState = session.getState( RESTState.class );
         final PluginState pState = session.getState( PluginState.class );
         final Set<Plugin> restOverrides = pState.getRemoteRESTOverrides();
         final Set<Plugin> bomOverrides = new LinkedHashSet<>();
-        final List<ProjectVersionRef> gavs = pState.getRemotePluginMgmt();
 
         Set<Plugin> mergedOverrides = new LinkedHashSet<>();
 
@@ -311,10 +319,10 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             }
 
             // Override plugin management versions
-            applyOverrides( project, PluginType.LocalPM, project.getResolvedManagedPlugins( session ), overrides );
+            applyOverrides( project, PluginType.LocalPM, model.getBuild().getPluginManagement().getPlugins(), project.getResolvedManagedPlugins( session ), overrides );
         }
 
-        applyOverrides( project, PluginType.LocalP, project.getResolvedPlugins( session ), overrides );
+        applyOverrides( project, PluginType.LocalP, Collections.emptyList(), project.getResolvedPlugins( session ), overrides );
         applyExplicitOverrides( project, project.getResolvedPlugins( session ), explicitOverrides,
                                 explicitVersionPropertyUpdateMap );
         applyExplicitOverrides( project, project.getResolvedManagedPlugins( session ), explicitOverrides,
@@ -324,16 +332,16 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
         final Map<Profile, Map<ProjectVersionRef, Plugin>> pmd = project.getResolvedProfileManagedPlugins( session );
 
         logger.debug( "Processing profiles with plugin management" );
-        for ( final Map<ProjectVersionRef, Plugin> plugins : pmd.values() )
+        for ( final Entry<Profile, Map<ProjectVersionRef, Plugin>> entry : pmd.entrySet() )
         {
-            applyOverrides( project, PluginType.LocalPM, plugins, overrides );
-            applyExplicitOverrides( project, plugins, explicitOverrides, explicitVersionPropertyUpdateMap );
+            applyOverrides( project, PluginType.LocalPM, entry.getKey().getBuild().getPluginManagement().getPlugins(), entry.getValue(), overrides );
+            applyExplicitOverrides( project, entry.getValue(), explicitOverrides, explicitVersionPropertyUpdateMap );
         }
         logger.debug( "Processing profiles with plugins" );
-        for ( final Map<ProjectVersionRef, Plugin> plugins : pd.values() )
+        for ( final Entry<Profile, Map<ProjectVersionRef, Plugin>> entry : pd.entrySet() )
         {
-            applyOverrides( project, PluginType.LocalP, plugins, overrides );
-            applyExplicitOverrides( project, plugins, explicitOverrides, explicitVersionPropertyUpdateMap );
+            applyOverrides( project, PluginType.LocalP, Collections.emptyList(), entry.getValue(), overrides );
+            applyExplicitOverrides( project, entry.getValue(), explicitOverrides, explicitVersionPropertyUpdateMap );
         }
 
         explicitOverridePropertyUpdates( session );
@@ -357,7 +365,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
      * @throws ManipulationException if an error occurs.
      */
     // TODO:  Pass in explicitOverrides to avoid potential property clashes.
-    private void applyOverrides( Project project, final PluginType localPluginType, final Map<ProjectVersionRef, Plugin> plugins,
+    private void applyOverrides( Project project, final PluginType localPluginType, final List<Plugin> managedPlugins, final Map<ProjectVersionRef, Plugin> plugins,
                                  final Set<Plugin> pluginVersionOverrides ) throws ManipulationException
     {
         if ( plugins == null )
@@ -387,11 +395,13 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             // override version.
             if ( pluginsByGA.containsKey( override.getKey() ) )
             {
-                // Potential match of override group:artifact to original plugin group:artifact.
-                String oldValue = pluginsByGA.get( override.getKey() ).getVersionString();
                 plugin = plugins.get( pluginsByGA.get( override.getKey() ) );
 
-                if ( plugin.getVersion().equals( Version.PROJECT_VERSION ) || ( plugin.getVersion().contains( "$" ) && project.getVersion().equals( oldValue ) ))
+                // Potential match of override group:artifact to original plugin group:artifact.
+                String oldValue = pluginsByGA.get( override.getKey() ).getVersionString();
+                String pluginVersion = Optional.ofNullable(plugin.getVersion()).orElse("");
+
+                if ( Version.PROJECT_VERSION.equals(pluginVersion) || ( pluginVersion.contains( "$" ) && project.getVersion().equals( oldValue ) ))
                 {
                     logger.warn( "Plugin {} for {} references ${project.version} so skipping.", plugin.getId(), project.getPom() );
                 }
@@ -537,10 +547,8 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
                     }
                 }
             }
-            // If the plugin doesn't exist but has a configuration section in the remote inject it so we
-            // get the correct config.
-            else if ( localPluginType == PluginType.LocalPM && commonState.isOverrideTransitive() && ( override.getConfiguration() != null
-                            || override.getExecutions().size() > 0 ) )
+            // If the plug-in doesn't exist, always add it making the enforcer happy
+            else if ( localPluginType == PluginType.LocalPM )
             {
                 Optional.ofNullable(project.getModel().getBuild()).ifPresent(build -> {
                     build.getPluginManagement().getPlugins().add(override);
@@ -549,7 +557,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             }
         }
     }
-
+    
     private void validatePluginsUpdatedProperty( CommonState cState, Project p, Map<ProjectVersionRef, Plugin> dependencies )
                     throws ManipulationException
     {

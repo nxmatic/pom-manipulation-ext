@@ -15,23 +15,6 @@
  */
 package org.commonjava.maven.ext.integrationtest;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.ConsoleAppender;
-import groovy.lang.Binding;
-import groovy.util.GroovyScriptEngine;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.SystemUtils;
-import org.commonjava.maven.ext.cli.Cli;
-import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.integrationtest.invoker.DefaultExecutionParser;
-import org.commonjava.maven.ext.integrationtest.invoker.Execution;
-import org.commonjava.maven.ext.integrationtest.invoker.ExecutionParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -49,6 +32,24 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
+import org.commonjava.maven.ext.cli.Cli;
+import org.commonjava.maven.ext.common.ManipulationException;
+import org.commonjava.maven.ext.integrationtest.invoker.DefaultExecutionParser;
+import org.commonjava.maven.ext.integrationtest.invoker.Execution;
+import org.commonjava.maven.ext.integrationtest.invoker.ExecutionParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
+import groovy.lang.Binding;
+import groovy.util.GroovyScriptEngine;
 
 /**
  * @author vdedik@redhat.com

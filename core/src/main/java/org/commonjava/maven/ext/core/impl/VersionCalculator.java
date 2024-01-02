@@ -16,9 +16,9 @@
 package org.commonjava.maven.ext.core.impl;
 
 import org.apache.commons.lang.StringUtils;
-import org.commonjava.maven.atlas.ident.ref.ProjectRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.util.PropertyResolver;
@@ -53,7 +53,7 @@ import static org.commonjava.maven.ext.core.util.IdUtils.gav;
  *
  * @author jdcasey
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
 @SuppressWarnings("WeakerAccess") // Public API.
 public class VersionCalculator

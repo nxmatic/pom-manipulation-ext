@@ -45,9 +45,9 @@ public class InitialGroovyManipulator
     implements Manipulator
 {
     @Inject
-    public InitialGroovyManipulator(ModelIO modelIO, FileIO fileIO, PomIO pomIO)
+    public InitialGroovyManipulator(FileIO fileIO, PomIO pomIO)
     {
-        super( modelIO, fileIO, pomIO );
+        super( fileIO, pomIO );
     }
     /**
      * Initialize the {@link GroovyState} state holder in the {@link ManipulationSession}. This state holder detects

@@ -15,12 +15,26 @@
  */
 package org.commonjava.maven.ext.core.util;
 
-import org.apache.commons.lang.StringUtils;
+import static org.apache.commons.lang.StringUtils.contains;
+import static org.apache.commons.lang.StringUtils.countMatches;
+import static org.apache.commons.lang.StringUtils.endsWith;
+import static org.apache.commons.lang.StringUtils.isNotEmpty;
+import static org.apache.commons.lang.StringUtils.startsWith;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.maven.model.Plugin;
 import org.apache.maven.model.Profile;
-import org.commonjava.maven.atlas.ident.ref.ProjectRef;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.util.ProfileUtils;
@@ -32,22 +46,6 @@ import org.commonjava.maven.ext.core.state.VersioningState;
 import org.commonjava.maven.ext.io.ConfigIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static org.apache.commons.lang.StringUtils.contains;
-import static org.apache.commons.lang.StringUtils.countMatches;
-import static org.apache.commons.lang.StringUtils.endsWith;
-import static org.apache.commons.lang.StringUtils.isEmpty;
-import static org.apache.commons.lang.StringUtils.isNotEmpty;
-import static org.apache.commons.lang.StringUtils.startsWith;
 
 /**
  * Commonly used manipulations / extractions from project / user (CLI) properties.
@@ -631,6 +629,7 @@ public final class PropertiesUtils
      * Common code used between CLI and EXT.
      * @param userProperties User properties stored internally.
      * @param config Properties to merge in.
+     * @return 
      */
     public static void handleConfigPrecedence( Properties userProperties, Properties config )
     {

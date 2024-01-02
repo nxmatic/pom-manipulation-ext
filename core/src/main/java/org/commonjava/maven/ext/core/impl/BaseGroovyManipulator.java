@@ -15,13 +15,22 @@
  */
 package org.commonjava.maven.ext.core.impl;
 
-import groovy.lang.GroovyShell;
-import groovy.lang.MissingMethodException;
-import groovy.lang.Script;
+import static org.apache.commons.lang.StringUtils.isEmpty;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
+import javax.inject.Inject;
+
 import org.apache.commons.io.FileUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
-import org.commonjava.maven.atlas.ident.ref.ArtifactRef;
-import org.commonjava.maven.atlas.ident.ref.SimpleArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
+import org.commonjava.atlas.maven.ident.ref.SimpleArtifactRef;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.model.SimpleScopedArtifactRef;
@@ -36,14 +45,9 @@ import org.commonjava.maven.ext.io.PomIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import static org.apache.commons.lang.StringUtils.isEmpty;
+import groovy.lang.GroovyShell;
+import groovy.lang.MissingMethodException;
+import groovy.lang.Script;
 
 /**
  * {@link Manipulator} implementation that can resolve a remote groovy file and execute it on executionRoot.
@@ -55,7 +59,8 @@ public abstract class BaseGroovyManipulator
     protected final Logger logger = LoggerFactory.getLogger( getClass() );
 
     @SuppressWarnings( "WeakerAccess" )
-    protected ModelIO modelIO;
+    @Inject
+    protected Collection<ModelIO> modelIOSingleton = Collections.emptySet();
 
     @SuppressWarnings( "WeakerAccess" )
     protected FileIO fileIO;
@@ -65,13 +70,20 @@ public abstract class BaseGroovyManipulator
 
     protected ManipulationSession session;
 
-    BaseGroovyManipulator( ModelIO modelIO, FileIO fileIO, PomIO pomIO )
+    BaseGroovyManipulator( FileIO fileIO, PomIO pomIO )
     {
-        this.modelIO = modelIO;
         this.fileIO = fileIO;
         this.pomIO = pomIO;
     }
+    
+    void injectModelIO(ModelIO thatModelIO) {
+        modelIOSingleton = Collections.singleton(thatModelIO);
+    }
 
+    ModelIO modelIO() {
+        return modelIOSingleton.iterator().next();
+    }
+    
     public abstract int getExecutionIndex();
 
     /**
@@ -109,7 +121,7 @@ public abstract class BaseGroovyManipulator
                         final ArtifactRef ar = SimpleScopedArtifactRef.parse( script );
                         logger.info( "Attempting to read GAV {} with classifier {} and type {}",
                                 ar.asProjectVersionRef(), ar.getClassifier(), ar.getType() );
-                        found = modelIO.resolveRawFile( ar );
+                        found = modelIO().resolveRawFile( ar );
                     }
                     result.add( found );
                 }
@@ -160,7 +172,7 @@ public abstract class BaseGroovyManipulator
                     currentStage = stage;
                 }
 
-                ( ( BaseScript ) script ).setValues( pomIO, fileIO, modelIO, session, projects, project, currentStage );
+                ( ( BaseScript ) script ).setValues( pomIO, fileIO, modelIO(), session, projects, project, currentStage );
             }
             else
             {

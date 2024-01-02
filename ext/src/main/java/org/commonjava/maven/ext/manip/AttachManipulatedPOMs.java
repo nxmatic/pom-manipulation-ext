@@ -44,11 +44,11 @@ import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.commonjava.maven.atlas.ident.ref.ProjectVersionRef;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.maven.ext.common.json.GAV;
 import org.commonjava.maven.ext.common.json.PME;
-import org.commonjava.maven.ext.core.ManipulatingExtensionBridge;
 import org.commonjava.maven.ext.core.ManipulationManager;
+import org.commonjava.maven.ext.core.bridge.ManipulatingExtensionBridge;
 
 /** Works in conjunction with ManipulatingLifeCycleParticipant. */
 @Mojo(name = ManipulatingExtensionBridge.GOAL_ATTACH_MODIFIED_POMS, instantiationStrategy = InstantiationStrategy.SINGLETON, threadSafe = true)

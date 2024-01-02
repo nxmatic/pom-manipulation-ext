@@ -121,7 +121,7 @@ public final class Utils
     public static Element findAndReplaceXpp3DOM( final IndentationCounter counter, final Element parent,
                                                  final String name, final Xpp3Dom dom )
     {
-        final boolean shouldExist = ( dom != null ) && ( dom.getChildCount() > 0 || dom.getValue() != null );
+        final boolean shouldExist = ( dom != null ) && ( dom.getChildCount() > 0 || dom.getValue() != null || dom.getAttributeNames().length > 0);
         final Element element = updateElement( counter, parent, name, shouldExist );
         if ( shouldExist )
         {

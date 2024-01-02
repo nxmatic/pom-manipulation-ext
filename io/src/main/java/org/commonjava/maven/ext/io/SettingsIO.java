@@ -45,7 +45,7 @@ import java.io.IOException;
 /**
  * @author vdedik@redhat.com
  */
-@Named
+@Named("pom-manipulation")
 @Singleton
 public class SettingsIO
 {
