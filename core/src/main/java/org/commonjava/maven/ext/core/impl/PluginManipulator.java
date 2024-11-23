@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
 import org.apache.maven.model.Build;
@@ -101,9 +102,9 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
     private final Map<Project,Map<String, PropertyMapper>> versionPropertyUpdateMap = new LinkedHashMap<>();
 
     @Inject
-    public PluginManipulator(ModelIO effectiveModelBuilder)
+    public PluginManipulator(Provider<ModelIO> modelProvider)
     {
-        this.effectiveModelBuilder = effectiveModelBuilder;
+        super(modelProvider);
     }
 
     /**
@@ -114,8 +115,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
     @Override
     public void init( final ManipulationSession session ) throws ManipulationException
     {
-        this.session = session;
-        session.setState( new PluginState( session.getUserProperties() ) );
+        session(session).setState( new PluginState( session().getUserProperties() ) );
     }
 
     /**
@@ -125,12 +125,12 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
     public Set<Project> applyChanges( final List<Project> projects )
         throws ManipulationException
     {
-        final PluginState state = session.getState( PluginState.class );
-        final CommonState cState = session.getState( CommonState.class );
+        final PluginState state = session().getState( PluginState.class );
+        final CommonState cState = session().getState( CommonState.class );
         final Set<ProjectVersionRef> gavs = loadMgmtGAVs();
         final Set<Plugin> mgmtOverrides = loadMgmtOverrides(gavs);
 
-        if ( !session.isEnabled() || !state.isEnabled()
+        if ( !session().isEnabled() || !state.isEnabled()
                 || ( mgmtOverrides.isEmpty() && state.getPluginOverride().isEmpty() ) )
         {
             logger.debug( getClass().getSimpleName() + ": Nothing to do!" );
@@ -157,9 +157,9 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
                 logger.info( "Iterating to validate plugin updates..." );
                 for ( final Project p : versionPropertyUpdateMap.keySet() )
                 {
-                    validatePluginsUpdatedProperty( cState, p, p.getResolvedPlugins( session ) );
+                    validatePluginsUpdatedProperty( cState, p, p.getResolvedPlugins( session() ) );
                     for ( final Map<ProjectVersionRef, Plugin> dependencies :
-                          p.getResolvedProfilePlugins( session ).values() )
+                          p.getResolvedProfilePlugins( session() ).values() )
                     {
                         validatePluginsUpdatedProperty( cState, p, dependencies );
                     }
@@ -176,7 +176,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
                     // Ignore strict alignment for plugins ; if we're attempting to use a differing plugin
                     // its unlikely to be an exact match.
                     final PropertiesUtils.PropertyUpdate found =
-                            PropertiesUtils.updateProperties( session, project , true, key, newVersion );
+                            PropertiesUtils.updateProperties( session(), project , true, key, newVersion );
 
                     if ( found == PropertiesUtils.PropertyUpdate.NOTFOUND )
                     {
@@ -200,7 +200,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
     }
 
     private Set<ProjectVersionRef> loadMgmtGAVs() {
-        final PluginState pState = session.getState( PluginState.class );
+        final PluginState pState = session().getState( PluginState.class );
         return pState.getRemotePluginMgmt().stream().collect(Collectors.toSet());
     }
 
@@ -208,8 +208,8 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
     private Set<Plugin> loadMgmtOverrides(Set<ProjectVersionRef> gavs)
         throws ManipulationException
     {
-        final RESTState rState = session.getState( RESTState.class );
-        final PluginState pState = session.getState( PluginState.class );
+        final RESTState rState = session().getState( RESTState.class );
+        final PluginState pState = session().getState( PluginState.class );
         final Set<Plugin> restOverrides = pState.getRemoteRESTOverrides();
         final Set<Plugin> bomOverrides = new LinkedHashSet<>();
 
@@ -221,13 +221,13 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             // but due to the simplification moving to a single Set, as that doesn't support replace operation,
             // we now iterate in normal order.
             final Iterator<ProjectVersionRef> iter = gavs.iterator();
-            final Properties exclusions = (Properties) session.getUserProperties().clone();
+            final Properties exclusions = (Properties) session().getUserProperties().clone();
             exclusions.putAll( System.getProperties() );
 
             while ( iter.hasNext() )
             {
                 final ProjectVersionRef ref = iter.next();
-                bomOverrides.addAll( effectiveModelBuilder.getRemotePluginManagementVersionOverrides( ref, exclusions ) );
+                bomOverrides.addAll( effectiveModelBuilder().getRemotePluginManagementVersionOverrides( ref, exclusions ) );
             }
         }
 
@@ -273,7 +273,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             logger.debug( "Applying plugin changes for {} to: {}", PluginType.RemotePM, ga( project ) );
         }
 
-        final PluginState pluginState = session.getState( PluginState.class );
+        final PluginState pluginState = session().getState( PluginState.class );
 
         // Map of Group : Map of artifactId [ may be wildcard ] : value
         final WildcardMap<String> explicitOverrides = new WildcardMap<>();
@@ -319,17 +319,17 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             }
 
             // Override plugin management versions
-            applyOverrides( project, PluginType.LocalPM, model.getBuild().getPluginManagement().getPlugins(), project.getResolvedManagedPlugins( session ), overrides );
+            applyOverrides( project, PluginType.LocalPM, model.getBuild().getPluginManagement().getPlugins(), project.getResolvedManagedPlugins( session() ), overrides );
         }
 
-        applyOverrides( project, PluginType.LocalP, Collections.emptyList(), project.getResolvedPlugins( session ), overrides );
-        applyExplicitOverrides( project, project.getResolvedPlugins( session ), explicitOverrides,
+        applyOverrides( project, PluginType.LocalP, Collections.emptyList(), project.getResolvedPlugins( session() ), overrides );
+        applyExplicitOverrides( project, project.getResolvedPlugins( session() ), explicitOverrides,
                                 explicitVersionPropertyUpdateMap );
-        applyExplicitOverrides( project, project.getResolvedManagedPlugins( session ), explicitOverrides,
+        applyExplicitOverrides( project, project.getResolvedManagedPlugins( session() ), explicitOverrides,
                                 explicitVersionPropertyUpdateMap );
 
-        final Map<Profile, Map<ProjectVersionRef, Plugin>> pd = project.getResolvedProfilePlugins( session );
-        final Map<Profile, Map<ProjectVersionRef, Plugin>> pmd = project.getResolvedProfileManagedPlugins( session );
+        final Map<Profile, Map<ProjectVersionRef, Plugin>> pd = project.getResolvedProfilePlugins( session() );
+        final Map<Profile, Map<ProjectVersionRef, Plugin>> pmd = project.getResolvedProfileManagedPlugins( session() );
 
         logger.debug( "Processing profiles with plugin management" );
         for ( final Entry<Profile, Map<ProjectVersionRef, Plugin>> entry : pmd.entrySet() )
@@ -344,7 +344,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             applyExplicitOverrides( project, entry.getValue(), explicitOverrides, explicitVersionPropertyUpdateMap );
         }
 
-        explicitOverridePropertyUpdates( session );
+        explicitOverridePropertyUpdates( session() );
     }
 
     /**
@@ -373,8 +373,8 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             throw new ManipulationException( "Original plugins should not be null" );
         }
 
-        final PluginState pluginState = session.getState( PluginState.class );
-        final CommonState commonState = session.getState( CommonState.class );
+        final PluginState pluginState = session().getState( PluginState.class );
+        final CommonState commonState = session().getState( CommonState.class );
         final HashMap<String, ProjectVersionRef> pluginsByGA = new LinkedHashMap<>(  );
         // Secondary map of original plugins group:artifact to pvr mapping.
         for ( ProjectVersionRef pvr : plugins.keySet() )
@@ -407,7 +407,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
                 }
                 else if ( commonState.isStrict() )
                 {
-                    if ( !PropertiesUtils.checkStrictValue( session, oldValue, newValue ) )
+                    if ( !PropertiesUtils.checkStrictValue( session(), oldValue, newValue ) )
                     {
                         if ( commonState.isFailOnStrictViolation() )
                         {
@@ -528,7 +528,7 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
 
                 // Due to StandardMaven304PluginDefaults::getDefault version returning "[0.0.0.1]" override version
                 // will never be null.
-                if ( !PropertiesUtils.cacheProperty( session, project, versionPropertyUpdateMap, oldVersion,
+                if ( !PropertiesUtils.cacheProperty( session(), project, versionPropertyUpdateMap, oldVersion,
                                                      newValue, plugin, false ) )
                 {
                     if ( oldVersion != null && oldVersion.equals( Version.PROJECT_VERSION ) )
@@ -551,7 +551,11 @@ public class PluginManipulator extends CommonManipulator implements Manipulator
             else if ( localPluginType == PluginType.LocalPM )
             {
                 Optional.ofNullable(project.getModel().getBuild()).ifPresent(build -> {
-                    build.getPluginManagement().getPlugins().add(override);
+                    PluginManagement pluginManagement = build.getPluginManagement();
+                    if (pluginManagement == null) {
+                        build.setPluginManagement(pluginManagement = new PluginManagement());
+                    }
+                    pluginManagement.getPlugins().add(override);
                     logger.info("Added plugin version: {}={}", override.getKey(), newValue);
                 });
             }

@@ -106,7 +106,7 @@ public class ManipulationManagerTest
         p.put( ManipulationManager.REWRITE_CHANGED, "false" );
 
         TestUtils.SMContainer smc = TestUtils.createSessionAndManager( p, projectRoot );
-        smc.getManager().scanAndApply( );
+        smc.getManager().scanAndApply( smc.getSession() );
 
         assertTrue( systemRule.getLog().contains( "Maven-Manipulation-Extension: Finished" ) );
         assertTrue( FileUtils.contentEquals( projectRoot, projectRootBackup) );

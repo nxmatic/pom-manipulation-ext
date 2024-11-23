@@ -27,22 +27,21 @@ import java.io.File;
  * 
  * @author jdcasey
  */
-public interface ExtensionInfrastructure
-{
-    
+public interface ExtensionInfrastructure {
+
     Default NULL = new Default();
-    
-    ExtensionInfrastructure init( ) throws ManipulationException;
+
+    ExtensionInfrastructure init() throws ManipulationException;
 
     // Only used for tests
-    ExtensionInfrastructure init( final Location customLocation, final Transport customTransport, File cacheDir ) throws ManipulationException;
+    ExtensionInfrastructure init(final Location customLocation, final Transport customTransport, File cacheDir)
+            throws ManipulationException;
 
     // Only used for tests
-    ExtensionInfrastructure init( File cacheDir ) throws ManipulationException;
+    ExtensionInfrastructure init(File cacheDir) throws ManipulationException;
 
     void finish();
-    
-    
+
     class Default implements ExtensionInfrastructure {
 
         @Override
@@ -63,9 +62,8 @@ public interface ExtensionInfrastructure
 
         @Override
         public void finish() {
-            
         }
-        
+
     }
-    
-  }
+
+}

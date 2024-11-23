@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +36,7 @@ import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
 import org.apache.maven.model.Dependency;
@@ -73,18 +73,18 @@ public class ModelIO {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     @Inject
-    private Collection<GalleyAPIWrapper> galleyWrapperSingleton;
+    private Provider<GalleyAPIWrapper> galleyWrapperProvider;
 
     ModelIO() {
         super();
     }
 
     public ModelIO(GalleyAPIWrapper galleyWrapper) {
-        this.galleyWrapperSingleton = Collections.singleton(galleyWrapper);
+        this.galleyWrapperProvider = () -> galleyWrapper;
     }
 
     private GalleyAPIWrapper galleyWrapper() {
-        return galleyWrapperSingleton.iterator().next();
+        return galleyWrapperProvider.get();
     }
 
     /**

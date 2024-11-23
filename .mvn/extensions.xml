@@ -28,13 +28,13 @@
     <version>0.0.0-dev</version>
   </extension>
   <extension>
-    <groupId>org.commonjava.maven.ext</groupId>
-    <artifactId>pom-manipulation-ext</artifactId>
+    <groupId>org.apache.maven.extensions</groupId>
+    <artifactId>maven-build-cache-extension</artifactId>
     <version>0.0.0-dev</version>
   </extension>
   <extension>
-    <groupId>org.apache.maven.extensions</groupId>
-    <artifactId>maven-build-cache-extension</artifactId>
+    <groupId>org.commonjava.maven.ext</groupId>
+    <artifactId>pom-manipulation-ext</artifactId>
     <version>0.0.0-dev</version>
   </extension>
   <!-- 4.16 -->

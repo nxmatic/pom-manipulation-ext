@@ -15,10 +15,21 @@
  */
 package org.commonjava.maven.ext.io.resolver;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+
+import org.apache.maven.SessionScoped;
 import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
 import org.commonjava.atlas.maven.ident.ref.ProjectRef;
 import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
+import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.galley.TransferException;
 import org.commonjava.maven.galley.maven.GalleyMavenException;
 import org.commonjava.maven.galley.maven.model.view.DocRef;
@@ -31,23 +42,12 @@ import org.commonjava.maven.galley.model.Transfer;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
-import javax.enterprise.context.SessionScoped;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 /**
  * Wraps the galley-maven APIs with the plumbing necessary to resolve using the repositories defined for the maven build.
  * 
  * @author jdcasey
  */
-@Named("pom-manipulation")
-@Singleton
+@Named(ManipulationComponent.HINT)
 @SessionScoped
 public class GalleyAPIWrapper
 {
@@ -64,26 +64,27 @@ public class GalleyAPIWrapper
     private GalleyInfrastructure infra;
 
     @Inject
-    public GalleyAPIWrapper(@Named("galley") GalleyInfrastructure infra)
+    public GalleyAPIWrapper(GalleyInfrastructure infra)
     {
         this.infra = infra;
     }
+    
 
     public Document parseXml( final String xml )
         throws GalleyMavenXMLException
     {
-        return infra.getXml()
+        return infra.getXML()
                     .parseDocument( xml, new ByteArrayInputStream( xml.getBytes(StandardCharsets.UTF_8) ) );
     }
 
     public MavenXmlView<ProjectRef> parseXmlView( final String xml )
         throws GalleyMavenXMLException
     {
-        final Document document = infra.getXml()
+        final Document document = infra.getXML()
                                        .parseDocument( xml, new ByteArrayInputStream( xml.getBytes(StandardCharsets.UTF_8) ) );
 
         final DocRef<ProjectRef> ref = new DocRef<>( new SimpleProjectRef( "unknown", "unknown" ), xml, document );
-        return new MavenXmlView<>( Collections.singletonList( ref ), infra.getXPath(), infra.getXml() );
+        return new MavenXmlView<>( Collections.singletonList( ref ), infra.getXPath(), infra.getXML() );
     }
 
     public MavenPomView readPomView( final ProjectVersionRef ref )
@@ -109,7 +110,7 @@ public class GalleyAPIWrapper
 
     public String toXML( final Node config, final boolean includeXmlDeclaration )
     {
-        return infra.getXml()
+        return infra.getXML()
                     .toXML( config, includeXmlDeclaration );
     }
 

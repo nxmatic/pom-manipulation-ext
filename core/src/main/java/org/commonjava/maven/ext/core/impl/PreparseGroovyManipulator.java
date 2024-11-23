@@ -68,7 +68,7 @@ public class PreparseGroovyManipulator
             return Collections.emptySet();
         }
 
-        final List<File> groovyScripts = parseGroovyScripts( state.getGroovyScripts() );
+        final List<File> groovyScripts = resolveGroovyScripts( state.getGroovyScripts() );
 
         for ( final File groovyScript : groovyScripts )
         {

@@ -44,6 +44,8 @@ import org.junit.Test;
 import org.junit.contrib.java.lang.system.SystemOutRule;
 import org.junit.rules.TemporaryFolder;
 
+import io.vavr.CheckedFunction2;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,6 +78,8 @@ public class PropertiesUtilsTest
 
     @Rule
     public TemporaryFolder temp = new TemporaryFolder();
+
+    private final CheckedFunction2<File,PomIO,Set<Project>> parseProject = PomIOTest.parseProject;
 
     private final Properties p = new Properties();
 
@@ -344,14 +348,14 @@ public class PropertiesUtilsTest
         ManipulationSession session = createUpdateSession();
 
         PomIO pomIO = new PomIO();
-        List<Project> projects = pomIO.parseProject( projectroot );
+        Set<Project> originalProjects = parseProject.unchecked().apply(projectroot, pomIO);
 
-        List<Project> newprojects = pomIO.parseProject( projectroot );
+        Set<Project> modifiedProjects = parseProject.unchecked().apply(projectroot, pomIO);
 
         WildcardMap<ProjectVersionRef> map = ( session.getState( RelocationState.class ) == null ?
                         new WildcardMap<>() :
                         session.getState( RelocationState.class ).getDependencyRelocations() );
-        String result = ProjectComparator.compareProjects( session, new PME(), map, projects, newprojects );
+        String result = ProjectComparator.compareProjects( session, new PME(), map, originalProjects, modifiedProjects );
 
         assertTrue( result.contains( "------------------- project org.infinispan:infinispan-bom" + System.lineSeparator() ) );
     }

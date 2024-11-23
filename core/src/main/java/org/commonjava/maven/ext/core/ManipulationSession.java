@@ -16,46 +16,73 @@
 package org.commonjava.maven.ext.core;
 
 import java.io.File;
-import java.text.MessageFormat;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
-import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.settings.Profile;
 import org.apache.maven.settings.Settings;
-import org.codehaus.plexus.logging.Logger;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.maven.ext.annotation.ConfigValue;
 import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.ext.common.ManipulationException;
 import org.commonjava.maven.ext.common.json.PME;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.session.MavenSessionHandler;
-import org.commonjava.maven.ext.core.bridge.ManipulatingExtensionBridge;
+import org.commonjava.maven.ext.common.util.JSONUtils;
+import org.commonjava.maven.ext.common.util.ManifestUtils;
+import org.commonjava.maven.ext.common.util.ProjectComparator;
+import org.commonjava.maven.ext.common.util.WildcardMap;
+import org.commonjava.maven.ext.core.bridge.ManipulationExtensionBridge;
 import org.commonjava.maven.ext.core.impl.Manipulator;
 import org.commonjava.maven.ext.core.state.CommonState;
 import org.commonjava.maven.ext.core.state.DependencyState;
+import org.commonjava.maven.ext.core.state.RelocationState;
 import org.commonjava.maven.ext.core.state.State;
 import org.commonjava.maven.ext.core.state.VersioningState;
 import org.commonjava.maven.ext.core.util.ManipulatorPriorityComparator;
 import org.commonjava.maven.ext.io.ConfigIO;
+import org.commonjava.maven.ext.io.PomIO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import io.vavr.CheckedFunction1;
+import io.vavr.CheckedRunnable;
 import io.vavr.control.Try;
 import lombok.Getter;
+import noname.devenv.maven.MultiModuleProjectLifecycleParticipant;
 
 /**
  * Repository for components that help manipulate POMs as needed, and state related to each {@link Manipulator} (which
@@ -66,39 +93,52 @@ import lombok.Getter;
  */
 @Named(ManipulationComponent.HINT)
 @Singleton
-@SessionScoped
-public class ManipulationSession implements MavenSessionHandler, ManipulationComponent {
+public class ManipulationSession implements MavenSessionHandler {
     @ConfigValue(docIndex = "../index.html#disabling-the-extension")
     private static final String MANIPULATIONS_DISABLED_PROP = "manipulation.disable";
 
     private final Map<Class<?>, State> states = new HashMap<>();
 
     @Inject
-    private ManipulatingExtensionBridge mojoBridge;
+    ManipulationManager manager;
+    
+    @Inject
+    @Named(ManipulationComponent.HINT)
+    Provider<MultiModuleProjectLifecycleParticipant> lifecycle;
 
     @Inject
-    private Logger logger;
-
-    @Inject
-    private MavenSession mavenSession;
+    private Provider<MavenSession> mavenSessionProvider = () -> {
+        throw new IllegalStateException("no maven session provider injected");
+    };
 
     @Inject
     private ConfigIO configIO;
 
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Inject
     public ManipulationSession() { // should exist for guice instrumentation
-        super();
+    }
+    
+    @PostConstruct
+    void checker() {
+        ;
     }
 
     /**
      * @return Returns the current MavenSession
      */
     public MavenSession getMavenSession() {
-        return mavenSession;
+        return mavenSessionProvider.get();
     }
 
-    ManipulationSession inject(MavenSession mavenSession) { // m2e, don't have the invoked session injected
-        this.mavenSession = mavenSession;
-        return this;
+    public void setMavenSession(MavenSession mavenSession) {
+        this.mavenSessionProvider = () -> mavenSession;
+    }
+
+    @Override
+    public String toString() {
+        return ToStringBuilder.reflectionToString(this);
     }
 
     /**
@@ -110,13 +150,13 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
     @Getter
     List<Manipulator> manipulators = Collections.emptyList();
 
-    void init(Set<Manipulator> manipulators) throws ManipulationException {
+    void init(Collection<Manipulator> manipulators) throws ManipulationException {
         injectManipulatorsAndComputeStates(manipulators);
         computeCommonState();
         readPreviousReport();
     }
 
-    private void injectManipulatorsAndComputeStates(Set<Manipulator> manipulators) throws ManipulationException {
+    private void injectManipulatorsAndComputeStates(Collection<Manipulator> manipulators) throws ManipulationException {
         // inject ordered manipulators and compute states
         List<Manipulator> orderedManipulators = new ArrayList<>(manipulators);
 
@@ -146,10 +186,185 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
         setState(cState);
     }
 
+    /**
+     * After projects are scanned for modifications, apply any modifications and rewrite POMs as needed. This method
+     * performs the following:
+     * <ul>
+     * <li>read the raw models (uninherited, with only a bare minimum interpolation) from disk to escape any
+     * interpretation happening during project-building</li>
+     * <li>apply any manipulations
+     * <li>rewrite any POMs that were changed</li>
+     * </ul>
+     * 
+     * @param manipulators the ordered list of Manipulators from the session
+     * @param projects the list of Projects to apply the changes to.
+     * @return collection of the changed projects.
+     * @throws ManipulationException if an error occurs.
+     */
+
+    /**
+     * List of manipulated <code>Project</code> instances.
+     */
+    public record Manipulations(TreeSet<Project> originalProjects, TreeSet<Project> manipulatedProjects) {
+
+        Manipulations() {
+            this(emptySetSupplier.get(), emptySetSupplier.get());
+        }
+
+        Stream<Project> executionRoots() {
+            return manipulatedProjects.stream().filter(Project::isExecutionRoot);
+        }
+
+        Manipulations extendsWith(TreeSet<Project> originalProjects, Stream<Project> manipulatedProjectsStream) {
+            return new Manipulations(merge(this.originalProjects, originalProjects.stream()),
+                    merge(this.manipulatedProjects, manipulatedProjectsStream));
+        }
+
+        TreeSet<Project> merge(TreeSet<Project> projects, Stream<Project> others) {
+            final Object clonedObject = projects.clone();
+            @SuppressWarnings({ "unchecked" })
+            TreeSet<Project> clonedProjects = projects.getClass().cast(clonedObject);
+            others.forEach(entry -> clonedProjects.add(entry));
+            return clonedProjects;
+        }
+
+        Manipulations applyManipulators(ManipulationSession session, List<Project> projects)
+                throws ManipulationException {
+            // check if manipulators are already applied
+            if (originalProjects().containsAll(projects)) {
+                session.logger.debug("Skipping, already applied for {}", projects.get(0));
+                return this;
+            }
+            // fetch original projects references from parameters
+            TreeSet<Project> originalProjects = emptySetSupplier.get();
+            projects.stream().map(Project::new).forEach(originalProjects::add);
+            Project executionRoot = projects.get(0);
+            // apply manipulators and update collected map with manipulated projects
+            session.logger.info("Running Maven Manipulation Extension (PME) {} [{}]",
+                    ManifestUtils.getManifestInformation(ManipulationManager.class), session.getPomFile());
+            session.logger.debug("Maven-Manipulation-Extension: applying changes for {}", session.getMavenSession());
+            Function<Manipulator, Set<Project>> applyChanges = CheckedFunction1.<Manipulator, Set<Project>> of(
+                    manipulator -> manipulator.applyChanges(projects)).unchecked();
+            Stream<Project> manipulatedProjectsStream = session.manipulators.stream()
+                                                                            .peek(manipulator -> session.logger.info(
+                                                                                    "Running manipulator {}",
+                                                                                    manipulator.getClass().getName()))
+                                                                            .flatMap(applyChanges.andThen(Set::stream));
+            Manipulations manipulations = extendsWith(originalProjects, manipulatedProjectsStream);
+            session.saveReport(executionRoot, manipulations);
+            return manipulations;
+        }
+
+        static final Comparator<Project> comparator = Comparator.comparing(Manipulations::hierarchyDepthOf)
+                                                                .thenComparing(Project::getKey);
+
+        static final Supplier<TreeSet<Project>> emptySetSupplier = () -> new TreeSet<Project>(comparator);
+
+        static int hierarchyDepthOf(Project project) {
+            if (project.isInheritanceRoot()) {
+                return 0;
+            }
+            Project projectParent = project.getProjectParent();
+            if (Objects.isNull(projectParent)) {
+                return 0;
+            }
+            return hierarchyDepthOf(projectParent) + 1;
+        }
+
+    }
+
+    protected Manipulations manipulations = new Manipulations();
+
+    public Set<Project> getManipulatedProjects() {
+        return manipulations.manipulatedProjects();
+    }
+
+    protected ExecutorService manipulationsMerger = Executors.newSingleThreadExecutor();
+
+    protected ConcurrentLinkedQueue<Manipulations> manipulationsQueue = new ConcurrentLinkedQueue<>();
+
+    Manipulations manipulate(List<Project> projects) throws ManipulationException {
+        return this.manipulations.applyManipulators(this, projects);
+    }
+
+    final PME jsonReport = new PME();
+
+    @Inject
+    ManipulationExtensionBridge mavenBridge;
+
+    @Inject
+    PomIO pomIO;
+
+    @Inject
+    Provider<ManipulationSession> manipulationSessionProvider;
+
+    Supplier<Boolean> isRewritingChanges = () -> Boolean.parseBoolean(
+            this.getUserProperties().getProperty(ManipulationManager.REWRITE_CHANGED, "true"));
+
+    void saveReport(Project executionRoot, Manipulations manipulated) throws ManipulationException {
+        ManipulationSession mergingSession = manipulationSessionProvider.get();
+        mergingSession.mavenSessionProvider = this::getMavenSession;
+        manipulationsQueue.add(manipulated);
+        manipulationsMerger.submit(
+                CheckedRunnable.of(() -> mergingSession.mergeAndReport(executionRoot, manipulated)).unchecked());
+    }
+
+    void mergeAndReport(Project executionRoot, Manipulations manipulated) throws ManipulationException {
+        manipulations = manipulationsQueue.remove();
+        while (!manipulationsQueue.isEmpty()) {
+            Manipulations other = manipulationsQueue.remove();
+            manipulations = this.manipulations.extendsWith(other.originalProjects(),
+                    other.manipulatedProjects().stream());
+        }
+        // post process modified projects
+        if (!isRewritingChanges.get()) {
+            mavenBridge.addMojo(executionRoot.getModel());
+            pomIO.writeTemporaryPOMs(manipulations.manipulatedProjects);
+        } else {
+            logger.debug("Maven-Manipulation-Extension: Rewriting changed");
+            pomIO.writePOMs(manipulations.manipulatedProjects);
+        }
+
+        jsonReport.getGav().setPVR(executionRoot.getKey());
+        jsonReport.getGav()
+                  .setOriginalGAV(getPreviousReport().map(report -> report.getGav().getOriginalGAV())
+                                                     .orElseGet(() -> executionRoot.getKey().toString()));
+        WildcardMap<ProjectVersionRef> map = getState(RelocationState.class) == null ? new WildcardMap<>()
+                : getState(RelocationState.class).getDependencyRelocations();
+        String report = ProjectComparator.compareProjects(this, jsonReport, map, manipulations.originalProjects,
+                manipulations.manipulatedProjects);
+        logger.info("{}{}", System.lineSeparator(), report);
+        String reportTxtOutputFile = getMavenSession().getUserProperties().getProperty("reportTxtOutputFile", "");
+
+        try {
+            getTargetDir().mkdir();
+            if (StringUtils.isNotEmpty(reportTxtOutputFile)) {
+                File reportFile = new File(reportTxtOutputFile);
+                FileUtils.writeStringToFile(reportFile, report, StandardCharsets.UTF_8);
+            }
+
+            String reportJsonOutputFile = getUserProperties().getProperty("reportJSONOutputFile",
+                    getTargetDir() + File.separator + "alignmentReport.json");
+
+            try (FileWriter writer = new FileWriter(reportJsonOutputFile)) {
+                writer.write(JSONUtils.jsonToString(jsonReport));
+            }
+        } catch (IOException cause) {
+            logger.error("Unable to create result file", cause);
+            throw new ManipulationException("Marker/result file creation failed", cause);
+        }
+
+        if (isRewritingChanges.get()) {
+            mavenBridge.addReport(getMavenSession(), jsonReport);
+        }
+
+        logger.info("Maven-Manipulation-Extension: Finished.");
+    }
+
     private Optional<PME> previousReport;
 
     void readPreviousReport() {
-        previousReport = mojoBridge.readReport(mavenSession);
+        previousReport = mavenBridge.readReport(mavenSessionProvider.get());
     }
 
     /**
@@ -158,13 +373,6 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
     Optional<PME> getPreviousReport() {
         return previousReport;
     }
-
-    /**
-     * List of <code>Project</code> instances.
-     */
-    private List<Project> projects;
-
-    private ManipulationException error;
 
     /**
      * True (enabled) by default, this is the kill switch for all manipulations. Manipulator implementations MAY also be
@@ -198,10 +406,6 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
         return stateType.cast(states.get(stateType));
     }
 
-    public void setMavenSession(final MavenSession mavenSession) {
-        this.mavenSession = mavenSession;
-    }
-
     @Override
     public Properties getUserProperties() {
         return userProperties;
@@ -218,78 +422,54 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
         }
 
         Properties userProperties() {
-            return mavenSession.getRequest().getUserProperties();
+            return mavenSessionProvider.get().getRequest().getUserProperties();
         }
 
         Properties activeProfilesProperties() {
-            List<String> activeProfileIds = mavenSession.getSettings().getActiveProfiles();
+            List<String> activeProfileIds = mavenSessionProvider.get().getSettings().getActiveProfiles();
 
-            return mavenSession.getSettings()
-                               .getProfiles()
-                               .stream()
-                               .filter(profile -> activeProfileIds.contains(profile.getId()))
-                               .map(Profile::getProperties)
-                               .collect(Properties::new, (props1, props2) -> props1.putAll(props2),
-                                       (props1, props2) -> {
-                                       });
+            return mavenSessionProvider.get()
+                                       .getSettings()
+                                       .getProfiles()
+                                       .stream()
+                                       .filter(profile -> activeProfileIds.contains(profile.getId()))
+                                       .map(Profile::getProperties)
+                                       .collect(Properties::new, (props1, props2) -> props1.putAll(props2),
+                                               (props1, props2) -> {
+                                               });
         }
 
         Properties loadParentProperties() {
             ManipulationSession manipulationSession = ManipulationSession.this;
             return Optional.of(manipulationSession.getMavenSession())
-                                              .map(MavenSession::getRequest)
-                                              .map(MavenExecutionRequest::getPom)
-                                              .map(File::getParentFile)
-                                              .map(pomFile -> Try.success(pomFile)
-                                                                 .mapTry(manipulationSession.configIO::parse)
-                                                                 .get())
-                                              .get();
+                           .map(MavenSession::getRequest)
+                           .map(MavenExecutionRequest::getPom)
+                           .map(File::getParentFile)
+                           .map(pomFile -> Try.success(pomFile).mapTry(manipulationSession.configIO::parse).get())
+                           .get();
         }
 
     };
 
     final UserProperties userProperties = new UserProperties();
 
-    public void setProjects(final List<Project> projects) {
-        this.projects = projects;
-    }
-
-    public List<Project> getProjects() {
-        return projects;
-    }
-
     @Override
     public List<ArtifactRepository> getRemoteRepositories() {
-        return mavenSession == null ? null : mavenSession.getRequest().getRemoteRepositories();
-    }
-
-    @Override
-    public File getPom() throws ManipulationException {
-        if (mavenSession == null) {
-            throw new ManipulationException("Invalid session");
-        }
-
-        return mavenSession.getRequest().getPom();
+        return mavenSessionProvider.get().getRequest().getRemoteRepositories();
     }
 
     @Override
     public File getTargetDir() {
-        if (mavenSession == null) {
-            return new File("target");
-        }
-
-        final File pom = mavenSession.getRequest().getPom();
-        if (pom == null) {
-            return new File("target");
-        }
-
-        return new File(pom.getParentFile(), "target");
+        File parentDirectory = mavenSessionProvider.get().getRequest().getMultiModuleProjectDirectory();
+        return new File(parentDirectory, "target");
     }
 
     @Override
     public ArtifactRepository getLocalRepository() {
-        return mavenSession == null ? null : mavenSession.getRequest().getLocalRepository();
+        return mavenSessionProvider.get().getLocalRepository();
     }
+
+    private ManipulationException error;
 
     /**
      * Used by extension ManipulatingEventSpy to store any errors during project construction and manipulation
@@ -311,13 +491,14 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
 
     @Override
     public List<String> getActiveProfiles() {
-        return mavenSession == null || mavenSession.getRequest() == null ? Collections.emptyList()
-                : mavenSession.getRequest().getActiveProfiles();
+        return Optional.ofNullable(mavenSessionProvider.get().getRequest())
+                       .map(MavenExecutionRequest::getActiveProfiles)
+                       .orElse(Collections.emptyList());
     }
 
     @Override
     public Settings getSettings() {
-        return mavenSession == null ? null : mavenSession.getSettings();
+        return mavenSessionProvider.get().getSettings();
     }
 
     /**
@@ -350,4 +531,28 @@ public class ManipulationSession implements MavenSessionHandler, ManipulationCom
         return Collections.emptyList();
     }
 
+    Optional<File> pomFileHolder = Optional.empty();
+
+    public Optional<File> setPomFile(File pomFile) {
+        try {
+            return pomFileHolder;
+        } finally {
+            pomFileHolder = Optional.ofNullable(pomFile);
+        }
+    }
+
+    @Override
+    public File getPomFile() {
+        return pomFileHolder.orElseGet(
+                () -> Optional.of(mavenSessionProvider.get().getRequest()).map(MavenExecutionRequest::getPom).get());
+    }
+
+    public File getMultiModuleProjectDirectory() {
+        return mavenSessionProvider.get().getRequest().getMultiModuleProjectDirectory();
+    }
+
+    @Override
+    public <T> T lookup(Class<T> claxz) throws ComponentLookupException {
+        return mavenSessionProvider.get().getContainer().lookup(claxz);
+    }
 }

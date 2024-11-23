@@ -350,6 +350,6 @@ public class DistributionEnforcingManipulatorTest
 
         final GalleyAPIWrapper wrapper = new GalleyAPIWrapper( galleyInfra );
 
-        manipulator = new DistributionEnforcingManipulator( wrapper );
+        manipulator = new DistributionEnforcingManipulator( () -> wrapper );
     }
 }

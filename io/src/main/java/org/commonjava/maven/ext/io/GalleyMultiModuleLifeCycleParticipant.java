@@ -15,50 +15,24 @@
  */
 package org.commonjava.maven.ext.io;
 
-import java.util.Collections;
-import java.util.Set;
-
 import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
+import javax.inject.Provider;
 
 import org.apache.maven.execution.MavenSession;
-import org.commonjava.maven.ext.io.resolver.ExtensionInfrastructure;
+import org.commonjava.maven.ext.io.resolver.GalleyInfrastructure;
 
-import io.vavr.CheckedConsumer;
-import noname.maven.devenv.spi.plexus.ForeignExtensionPackages;
-import noname.maven.devenv.spi.plexus.MultiModuleProjectLifecycleParticipant;
+import noname.devenv.maven.MultiModuleProjectLifecycleParticipant;
 
-@Named("galley")
-@Singleton
-@ForeignExtensionPackages.Import(groupId = "noname.maven.extensions.devenv", artifactId = "maven-devenv-extension", packages = "noname.maven.devenv.spi.plexus")
-public class GalleyMultiModuleLifeCycleParticipant implements MultiModuleProjectLifecycleParticipant.Registration,
-        MultiModuleProjectLifecycleParticipant.Actions, MultiModuleProjectLifecycleParticipant.Listener {
+//@Named("galley")
+//@Singleton
+//@ForeignExtensionPackages.Import(groupId = "noname.maven.extensions.devenv", artifactId = "maven-devenv-extension", packages = { "noname.maven.devenv.plexus", "noname.maven.devenv.plexus.INTERNAL" })
+public class GalleyMultiModuleLifeCycleParticipant implements MultiModuleProjectLifecycleParticipant.SPI {
 
     @Inject
-    private Set<ExtensionInfrastructure> infrastructures = Collections.emptySet();
+    private Provider<GalleyInfrastructure> galleyProvider;  
 
-    @Override
-    public void init(MavenSession session) throws Exception {
-        run(ExtensionInfrastructure::init);
-    }
-
-    @Override
     public void finish(MavenSession session) throws Exception {
-        run(ExtensionInfrastructure::finish);
+        galleyProvider.get().finish();
     }
 
-    @Override
-    public MultiModuleProjectLifecycleParticipant.Actions actions() {
-        return this;
-    }
-
-    @Override
-    public MultiModuleProjectLifecycleParticipant.Listener listener() {
-        return this;
-    }
-
-    void run(CheckedConsumer<ExtensionInfrastructure> checked) {
-        infrastructures.stream().forEach(infra -> checked.unchecked().accept(infra));
-    }
 }

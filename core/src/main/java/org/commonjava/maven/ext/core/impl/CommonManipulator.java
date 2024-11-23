@@ -15,6 +15,16 @@
  */
 package org.commonjava.maven.ext.core.impl;
 
+import static org.apache.commons.lang.StringUtils.isEmpty;
+import static org.apache.commons.lang.StringUtils.join;
+
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.inject.Provider;
+
 import org.apache.maven.model.Exclusion;
 import org.apache.maven.model.InputLocationTracker;
 import org.commonjava.atlas.maven.ident.ref.ArtifactRef;
@@ -22,23 +32,15 @@ import org.commonjava.atlas.maven.ident.ref.ProjectRef;
 import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
 import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.core.util.DependencyPluginWrapper;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.util.WildcardMap;
 import org.commonjava.maven.ext.core.ManipulationSession;
+import org.commonjava.maven.ext.core.util.DependencyPluginWrapper;
 import org.commonjava.maven.ext.core.util.PropertiesUtils;
 import org.commonjava.maven.ext.core.util.PropertyMapper;
 import org.commonjava.maven.ext.io.ModelIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import static org.apache.commons.lang.StringUtils.isEmpty;
-import static org.apache.commons.lang.StringUtils.join;
 
 /**
  * Shared base class for Plugin and Dependency manipulator - enables sharing of some common code.
@@ -46,15 +48,34 @@ import static org.apache.commons.lang.StringUtils.join;
 public class CommonManipulator
 {
     protected final Logger logger = LoggerFactory.getLogger( getClass() );
+    
+    protected CommonManipulator(Provider<ModelIO> thatModelProvider) {
+        effectiveModelBuilderProvider = thatModelProvider;
+        sessionProvider = () -> { throw new IllegalStateException("No session available"); };
+    }
 
     /**
      * Used to store mappings of old property to new version for explicit overrides.
      */
     protected final Map<Project,Map<String, PropertyMapper>> explicitVersionPropertyUpdateMap = new LinkedHashMap<>();
 
-    protected ModelIO effectiveModelBuilder;
+    private final Provider<ModelIO> effectiveModelBuilderProvider;
+    
+    protected ModelIO effectiveModelBuilder() {
+        return effectiveModelBuilderProvider.get();
+    }
 
-    protected ManipulationSession session;
+    private Provider<ManipulationSession> sessionProvider;
+    
+    protected ManipulationSession session() {
+        return sessionProvider.get();
+    }
+    
+    protected ManipulationSession session(ManipulationSession session) {
+        sessionProvider = () -> session;
+        return sessionProvider.get();
+    }
+    
 
     /**
      * Remove module overrides which do not apply to the current module. Searches the full list of version overrides
@@ -293,7 +314,7 @@ public class CommonManipulator
                         {
                             logger.info( "Explicit overrides : force aligning {} to {}.", groupIdArtifactId, target );
 
-                            if ( !PropertiesUtils.cacheProperty( session, project, versionPropertyUpdateMap,
+                            if ( !PropertiesUtils.cacheProperty( session(), project, versionPropertyUpdateMap,
                                                                  oldVersion,
                                                                  target, projectVersionRef, true ) )
                             {

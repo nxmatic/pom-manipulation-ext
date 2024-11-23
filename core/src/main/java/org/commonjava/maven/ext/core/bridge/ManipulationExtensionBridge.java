@@ -48,7 +48,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 @Named("pom-manipulation")
 @Singleton
-public class ManipulatingExtensionBridge {
+public class ManipulationExtensionBridge {
 
     public static final String GOAL_ATTACH_MODIFIED_POMS = "attach-manipulated-poms";
     public static final String EXTENSION_ARTIFACT_ID = "pom-manipulation-ext";
@@ -65,8 +65,7 @@ public class ManipulatingExtensionBridge {
      * @param report
      * @throws ManipulationException 
      */
-    public void addReport(MavenSession session, Model model, PME report) throws ManipulationException {
-        session.getRequest().setPom(model.getPomFile());
+    public void addReport(MavenSession session, PME report) throws ManipulationException {
         try {
             session.getUserProperties().put(ManipulationManager.REPORT_USER_PROPERTY_KEY, JSONUtils.jsonToString(report));
         } catch (IOException e) {

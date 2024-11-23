@@ -286,7 +286,7 @@ public class Cli implements Callable<Integer>
                 // When just listing dependencies we don't want to strip any snapshot suffix.
                 session.getUserProperties().put( VERSION_SUFFIX_SNAPSHOT_SYSPROP, "true");
                 session.reinitialiseStates();
-                List<ArtifactRef> ts = RESTCollector.establishAllDependencies( session, pomIO.parseProject( session.getPom() ),
+                List<ArtifactRef> ts = RESTCollector.establishAllDependencies( session, pomIO.parseProject( session.getPomFile() ),
                                                                               profiles ).stream().sorted().collect(Collectors.toList());
                 System.out.format( "Found %d dependencies%n", ts.size() );
                 System.out.format( "\u001B[32m%-80s%-20s%-20s%-20s\033[0m%n",
@@ -317,7 +317,7 @@ public class Cli implements Callable<Integer>
             {
                 try
                 {
-                    manipulationManager.scanAndApply( );
+                    manipulationManager.scanAndApply( session );
                 }
                 finally
                 {

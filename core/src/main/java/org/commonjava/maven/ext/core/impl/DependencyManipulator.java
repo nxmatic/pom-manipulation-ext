@@ -15,6 +15,28 @@
  */
 package org.commonjava.maven.ext.core.impl;
 
+import static org.apache.commons.lang.StringUtils.isEmpty;
+import static org.apache.commons.lang.StringUtils.startsWith;
+import static org.commonjava.maven.ext.core.util.IdUtils.ga;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Provider;
+import javax.inject.Singleton;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
@@ -29,8 +51,6 @@ import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
 import org.commonjava.atlas.maven.ident.ref.SimpleProjectRef;
 import org.commonjava.atlas.maven.ident.ref.SimpleProjectVersionRef;
 import org.commonjava.maven.ext.common.ManipulationException;
-import org.commonjava.maven.ext.core.util.PluginReference;
-import org.commonjava.maven.ext.core.util.DependencyPluginWrapper;
 import org.commonjava.maven.ext.common.model.Project;
 import org.commonjava.maven.ext.common.model.SimpleScopedArtifactRef;
 import org.commonjava.maven.ext.common.util.PropertyResolver;
@@ -41,30 +61,12 @@ import org.commonjava.maven.ext.core.state.DependencyState;
 import org.commonjava.maven.ext.core.state.DependencyState.DependencyPrecedence;
 import org.commonjava.maven.ext.core.state.RESTState;
 import org.commonjava.maven.ext.core.util.DependencyPluginUtils;
+import org.commonjava.maven.ext.core.util.DependencyPluginWrapper;
+import org.commonjava.maven.ext.core.util.PluginReference;
 import org.commonjava.maven.ext.core.util.PropertiesUtils;
 import org.commonjava.maven.ext.core.util.PropertyMapper;
 import org.commonjava.maven.ext.io.ModelIO;
 import org.commonjava.maven.ext.io.resolver.GalleyAPIWrapper;
-
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import static org.apache.commons.lang.StringUtils.isEmpty;
-import static org.apache.commons.lang.StringUtils.startsWith;
-import static org.commonjava.maven.ext.core.util.IdUtils.ga;
 
 /**
  * {@link Manipulator} implementation that can alter dependency (and dependency management) sections in a project's pom file.
@@ -74,7 +76,7 @@ import static org.commonjava.maven.ext.core.util.IdUtils.ga;
 @Singleton
 public class DependencyManipulator extends CommonManipulator implements Manipulator
 {
-    private final GalleyAPIWrapper galleyWrapper;
+    private final Provider<GalleyAPIWrapper> galleyWrapperProvider;
 
     /**
      * Used to store mappings of old property to new version - the new version is encapsulated within the {@link PropertyMapper}
@@ -85,12 +87,15 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
     private final Map<Project,Map<String, PropertyMapper>> versionPropertyUpdateMap = new LinkedHashMap<>();
 
     @Inject
-    public DependencyManipulator(ModelIO effectiveModelBuilder, GalleyAPIWrapper galleyWrapper)
+    public DependencyManipulator(Provider<ModelIO> effectiveModelBuilder, Provider<GalleyAPIWrapper> galleyWrapper)
     {
-        this.effectiveModelBuilder = effectiveModelBuilder;
-        this.galleyWrapper = galleyWrapper;
+        super(effectiveModelBuilder);
+        this.galleyWrapperProvider = galleyWrapper;
     }
-
+    
+    protected GalleyAPIWrapper galleyWrapper() {
+        return galleyWrapperProvider.get();
+    }
     /**
      * Initialize the {@link DependencyState} state holder in the {@link ManipulationSession}. This state holder detects
      * version-change configuration from the Maven user properties (-D properties from the CLI) and makes it available for
@@ -99,8 +104,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
     @Override
     public void init( final ManipulationSession session ) throws ManipulationException
     {
-        session.setState( new DependencyState( session.getUserProperties() ) );
-        this.session = session;
+        session(session).setState( new DependencyState( session().getUserProperties() ) );
     }
 
     /**
@@ -110,9 +114,9 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
     public Set<Project> applyChanges( final List<Project> projects )
                     throws ManipulationException
     {
-        final DependencyState state = session.getState( DependencyState.class );
+        final DependencyState state = session().getState( DependencyState.class );
 
-        if ( !session.isEnabled() || !state.isEnabled() )
+        if ( !session().isEnabled() || !state.isEnabled() )
         {
             logger.debug( "{}: Nothing to do!", getClass().getSimpleName() );
             return Collections.emptySet();
@@ -129,8 +133,8 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
      */
     private Map<ArtifactRef, String> loadRemoteOverrides() throws ManipulationException
     {
-        final DependencyState depState = session.getState( DependencyState.class );
-        final RESTState restState = session.getState( RESTState.class );
+        final DependencyState depState = session().getState( DependencyState.class );
+        final RESTState restState = session().getState( RESTState.class );
         final List<ProjectVersionRef> gavs = depState.getRemoteBOMDepMgmt();
 
         final Map<String, ProjectVersionRef> extraGAVs = depState.getExtraBOMs();
@@ -152,7 +156,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
             while ( iter.hasPrevious() )
             {
                 final ProjectVersionRef ref = iter.previous();
-                Map<ArtifactRef, String> rBom = effectiveModelBuilder.getRemoteDependencyVersionOverrides( ref );
+                Map<ArtifactRef, String> rBom = effectiveModelBuilder().getRemoteDependencyVersionOverrides( ref );
 
                 // We don't normalise the BOM list here as ::applyOverrides can handle multiple GA with different V
                 // for strict override. However, it is undefined if strict is not enabled.
@@ -164,7 +168,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
         for ( Entry<String, ProjectVersionRef> entry : extraGAVs.entrySet() )
         {
             extraBOMOverrides.put( entry.getKey(),
-                                   effectiveModelBuilder.getRemoteDependencyVersionOverridesByProject( entry.getValue() ) );
+                                   effectiveModelBuilder().getRemoteDependencyVersionOverridesByProject( entry.getValue() ) );
         }
 
         if ( depState.getPrecedence() == DependencyPrecedence.BOM )
@@ -237,8 +241,8 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
     private Set<Project> internalApplyChanges( final List<Project> projects, Map<ArtifactRef, String> overrides )
                     throws ManipulationException
     {
-        final DependencyState state = session.getState( DependencyState.class );
-        final CommonState cState = session.getState( CommonState.class );
+        final DependencyState state = session().getState( DependencyState.class );
+        final CommonState cState = session().getState( CommonState.class );
         final Set<Project> result = new HashSet<>( projects.size() );
 
         for ( final Project project : projects )
@@ -261,9 +265,9 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                 logger.info( "Iterating to validate dependency updates..." );
                 for ( final Project p : versionPropertyUpdateMap.keySet() )
                 {
-                    validateDependenciesUpdatedProperty( cState, p, p.getResolvedDependencies( session ) );
+                    validateDependenciesUpdatedProperty( cState, p, p.getResolvedDependencies( session() ) );
                     for ( final Map<ArtifactRef, Dependency> dependencies :
-                          p.getResolvedProfileDependencies( session ).values() )
+                          p.getResolvedProfileDependencies( session() ).values() )
                     {
                         validateDependenciesUpdatedProperty( cState, p, dependencies );
                     }
@@ -282,7 +286,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                     final String key = entry.getKey();
                     final PropertyMapper mapper = entry.getValue();
                     final String newVersion = mapper.getNewVersion();
-                    final PropertiesUtils.PropertyUpdate found = PropertiesUtils.updateProperties( session, project,
+                    final PropertiesUtils.PropertyUpdate found = PropertiesUtils.updateProperties( session(), project,
                             false, key, newVersion );
 
                     if ( found == PropertiesUtils.PropertyUpdate.NOTFOUND )
@@ -298,7 +302,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                 }
             }
 
-            explicitOverridePropertyUpdates( session );
+            explicitOverridePropertyUpdates( session() );
         }
 
         return result;
@@ -313,8 +317,8 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
         // Map of Group : Map of artifactId [ may be wildcard ] : value
         final WildcardMap<String> explicitOverrides = new WildcardMap<>();
         final String projectGA = ga( project );
-        final DependencyState dependencyState = session.getState( DependencyState.class );
-        final CommonState commonState = session.getState( CommonState.class );
+        final DependencyState dependencyState = session().getState( DependencyState.class );
+        final CommonState commonState = session().getState( CommonState.class );
 
         logger.debug( "Processing project {}", projectGA );
 
@@ -351,7 +355,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                     {
                         if ( commonState.isStrict() )
                         {
-                            if ( !PropertiesUtils.checkStrictValue( session, oldValue, newValue ) )
+                            if ( !PropertiesUtils.checkStrictValue( session(), oldValue, newValue ) )
                             {
                                 if ( commonState.isFailOnStrictViolation() )
                                 {
@@ -395,10 +399,10 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
             logger.debug( "Applying overrides to managed dependencies for: {}", projectGA );
 
             final Map<ArtifactRef, String> nonMatchingVersionOverrides =
-                            applyOverrides( project, project.getResolvedManagedDependencies( session ),
+                            applyOverrides( project, project.getResolvedManagedDependencies( session() ),
                                             explicitOverrides, originalOverrides );
 
-            applyExplicitOverrides( project, project.getResolvedManagedDependencies( session ), explicitOverrides,
+            applyExplicitOverrides( project, project.getResolvedManagedDependencies( session() ), explicitOverrides,
                                     explicitVersionPropertyUpdateMap );
 
             if ( commonState.isOverrideTransitive() && dependencyState.getRemoteBOMDepMgmt() != null )
@@ -456,20 +460,20 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
         else
         {
             logger.debug( "Applying overrides to managed dependencies for: {}", projectGA );
-            applyOverrides( project, project.getResolvedManagedDependencies( session ), explicitOverrides,
+            applyOverrides( project, project.getResolvedManagedDependencies( session() ), explicitOverrides,
                             originalOverrides );
-            applyExplicitOverrides( project, project.getResolvedManagedDependencies( session ), explicitOverrides,
+            applyExplicitOverrides( project, project.getResolvedManagedDependencies( session() ), explicitOverrides,
                                     explicitVersionPropertyUpdateMap );
         }
 
         logger.debug( "Applying overrides to concrete dependencies for: {}", projectGA );
         // Apply overrides to project direct dependencies
-        applyOverrides( project, project.getResolvedDependencies( session ), explicitOverrides, originalOverrides );
-        applyExplicitOverrides( project, project.getResolvedDependencies( session ), explicitOverrides,
+        applyOverrides( project, project.getResolvedDependencies( session() ), explicitOverrides, originalOverrides );
+        applyExplicitOverrides( project, project.getResolvedDependencies( session() ), explicitOverrides,
                                 explicitVersionPropertyUpdateMap );
 
-        final Map<Profile, Map<ArtifactRef, Dependency>> pd = project.getResolvedProfileDependencies( session );
-        final Map<Profile, Map<ArtifactRef, Dependency>> pmd = project.getResolvedProfileManagedDependencies( session );
+        final Map<Profile, Map<ArtifactRef, Dependency>> pd = project.getResolvedProfileDependencies( session() );
+        final Map<Profile, Map<ArtifactRef, Dependency>> pmd = project.getResolvedProfileManagedDependencies( session() );
 
         for ( final Map<ArtifactRef, Dependency> dependencies : pd.values() )
         {
@@ -484,27 +488,27 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
         }
 
         // Apply dependency changes to dependencies that occur within plugins.
-        final  Map<ProjectVersionRef, Plugin> resolvedPlugins = project.getAllResolvedPlugins( session );
+        final  Map<ProjectVersionRef, Plugin> resolvedPlugins = project.getAllResolvedPlugins( session() );
         applyPlugins( project, resolvedPlugins, explicitOverrides, originalOverrides);
         applyExplicitOverrides( project, resolvedPlugins, explicitOverrides, explicitVersionPropertyUpdateMap );
 
-        final  Map<ProjectVersionRef, Plugin> resolvedManagedPlugins = project.getResolvedManagedPlugins( session );
+        final  Map<ProjectVersionRef, Plugin> resolvedManagedPlugins = project.getResolvedManagedPlugins( session() );
         applyPlugins( project, resolvedManagedPlugins, explicitOverrides, originalOverrides);
         applyExplicitOverrides( project, resolvedManagedPlugins, explicitOverrides, explicitVersionPropertyUpdateMap );
 
-        for (Map<ProjectVersionRef, Plugin> resolvedProfilePlugins : project.getAllResolvedProfilePlugins( session ).values() )
+        for (Map<ProjectVersionRef, Plugin> resolvedProfilePlugins : project.getAllResolvedProfilePlugins( session() ).values() )
         {
             applyPlugins( project, resolvedProfilePlugins, explicitOverrides, originalOverrides);
             applyExplicitOverrides( project, resolvedProfilePlugins, explicitOverrides, explicitVersionPropertyUpdateMap );
         }
-        for (Map<ProjectVersionRef, Plugin> resolvedManagedProfilePlugins : project.getResolvedProfileManagedPlugins( session ).values() )
+        for (Map<ProjectVersionRef, Plugin> resolvedManagedProfilePlugins : project.getResolvedProfileManagedPlugins( session() ).values() )
         {
             applyPlugins( project, resolvedManagedProfilePlugins, explicitOverrides, originalOverrides);
             applyExplicitOverrides( project, resolvedManagedProfilePlugins, explicitOverrides, explicitVersionPropertyUpdateMap );
         }
 
         // This handles dependencies of plugins themselves.
-        final List<Map<ArtifactRef, Dependency>> pluginDependencies = project.getAllResolvedPluginDependencies( session );
+        final List<Map<ArtifactRef, Dependency>> pluginDependencies = project.getAllResolvedPluginDependencies( session() );
         for (Map<ArtifactRef, Dependency> depMap : pluginDependencies)
         {
             applyOverrides( project, depMap, explicitOverrides, originalOverrides );
@@ -517,7 +521,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                     throws ManipulationException
     {
         // Handles plugin configurations
-        final List<PluginReference> refs = DependencyPluginUtils.findPluginReferences( galleyWrapper, project, plugins );
+        final List<PluginReference> refs = DependencyPluginUtils.findPluginReferences( galleyWrapperProvider.get(), project, plugins );
 
         // We need to create a map of PVR to PluginReference (which need to extend InputLocationTracker)
         // Use PropertyResolver to resolve the version (if it exists) inside PluginReference (ignore if doesn't)
@@ -527,7 +531,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
             if (reference.getVersion() != null)
             {
                 String resolvedVersion =
-                                PropertyResolver.resolveInheritedProperties( session, project, reference.getVersion() );
+                                PropertyResolver.resolveInheritedProperties( session(), project, reference.getVersion() );
                 ProjectVersionRef resolvedRef = new SimpleProjectVersionRef( reference.getGroupId(), reference.getArtifactId(),
                                                                              resolvedVersion );
                 pluginsWithDeps.put( resolvedRef, reference );
@@ -563,7 +567,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
             return unmatchedVersionOverrides;
         }
 
-        final CommonState commonState = session.getState( CommonState.class );
+        final CommonState commonState = session().getState( CommonState.class );
         final boolean strict = commonState.isStrict();
 
         // Apply matching overrides to dependencies
@@ -616,7 +620,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                     // Can't blindly compare resolvedValue [original] against ar as ar / overrideVersion is the new GAV. We don't
                     // have immediate access to the original property so the closest that is feasible is verify strict matching.
                     else if ( strict && oldVersion.contains( "$" ) &&
-                                    ! PropertiesUtils.checkStrictValue( session, resolvedValue, overrideVersion) )
+                                    ! PropertiesUtils.checkStrictValue( session(), resolvedValue, overrideVersion) )
                     {
                         logger.debug ("Original fully resolved version {} for {} does not match override version {} -> {} so ignoring",
                                       resolvedValue, dependency, entry.getKey(), overrideVersion);
@@ -634,9 +638,9 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                     }
                     else
                     {
-                        if ( ! PropertiesUtils.cacheProperty( session, project, versionPropertyUpdateMap, oldVersion, overrideVersion, entry.getKey(), false ))
+                        if ( ! PropertiesUtils.cacheProperty( session(), project, versionPropertyUpdateMap, oldVersion, overrideVersion, entry.getKey(), false ))
                         {
-                            if ( strict && ! PropertiesUtils.checkStrictValue( session, resolvedValue, overrideVersion) )
+                            if ( strict && ! PropertiesUtils.checkStrictValue( session(), resolvedValue, overrideVersion) )
                             {
                                 if ( commonState.isFailOnStrictViolation() )
                                 {
@@ -658,7 +662,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
                                 // This block handles a version that is a partial property with a value.
                                 if ( oldVersion.contains( "${" ) )
                                 {
-                                    String suffix = PropertiesUtils.getSuffix( session );
+                                    String suffix = PropertiesUtils.getSuffix( session() );
                                     String replaceVersion;
 
                                     // Handles ${...}...-rebuild-n -> ${...}...-rebuild-n+1
@@ -711,7 +715,7 @@ public class DependencyManipulator extends CommonManipulator implements Manipula
         while ( it.hasNext() )
         {
             final Entry<ArtifactRef, String> e = it.next();
-            session.getProjects().forEach( p -> {
+            session().getManipulatedProjects().forEach( p -> {
                 if ( e.getKey().getGroupId().equals( p.getGroupId() )
                         && e.getKey().getArtifactId().equals( p.getArtifactId() ) )
                 {

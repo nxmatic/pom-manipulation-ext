@@ -34,6 +34,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -124,7 +125,11 @@ public class BOMBuilderManipulator
                 // Write new bom back out.
                 File pmebom = new File( session.getTargetDir(), IDBOM + ".xml" );
                 session.getTargetDir().mkdir();
-                pomIO.writeModel( bomModel, pmebom );
+                try {
+                    pomIO.writeModel( bomModel, pmebom );
+                } catch (IOException cause) {
+                    throw new ManipulationException("Cannot write generated BOM",  cause);
+                }
 
                 final Map<String, Plugin> pluginMap = build.getPluginsAsMap();
 

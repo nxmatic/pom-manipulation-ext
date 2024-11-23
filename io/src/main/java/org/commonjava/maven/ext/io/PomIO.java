@@ -16,9 +16,13 @@
 package org.commonjava.maven.ext.io;
 
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -28,22 +32,26 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -52,6 +60,7 @@ import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.reflect.FieldUtils;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.apache.maven.model.io.xpp3.MavenXpp3Writer;
@@ -76,6 +85,8 @@ import org.jdom2.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.vavr.CheckedFunction1;
+import io.vavr.CheckedFunction2;
 import io.vavr.control.Try;
 
 /**
@@ -102,22 +113,17 @@ public class PomIO {
     private final String manifestComment = buildManifestComment();
 
     @Inject
-    private Collection<MavenSessionHandler> handlerSingleton;
+    private Provider<MavenSessionHandler> handlerProvider = () -> { throw new IllegalStateException(); };
 
     private boolean parsePomTemplates() {
-        if (handlerSingleton.isEmpty()) {
-            return true;
-        }
         return Boolean.parseBoolean(
-                handlerSingleton.iterator().next().getUserProperties().getProperty(PARSE_POM_TEMPLATES, "true"));
+                handlerProvider.get().getUserProperties().getProperty(PARSE_POM_TEMPLATES, "true"));
     }
 
-    public PomIO() {
-        handlerSingleton = Collections.emptySet();
-    }
+    public PomIO() { }
 
     public PomIO(MavenSessionHandler handler) { // for test usage
-        handlerSingleton = Collections.singleton(handler);
+        handlerProvider = () -> handler;
     }
 
     public List<Project> parseProject(final File pom) throws ManipulationException {
@@ -164,7 +170,6 @@ public class PomIO {
 
             final Project project = new Project(pom, raw);
             projectToParent.put(project, peek.getParentKey());
-            project.setInheritanceRoot(peek.isInheritanceRoot());
 
             if (executionRoot.equals(pom)) {
 
@@ -182,6 +187,10 @@ public class PomIO {
                 } catch (final IOException e) {
                     throw new ManipulationException("Failed to read POM: {}", pom, e);
                 }
+            }
+
+            if (peek.isInheritanceRoot()) {
+                project.setInheritanceRoot();
             }
 
             projects.add(project);
@@ -216,8 +225,7 @@ public class PomIO {
      */
     public void writeTemporaryPOMs(final Set<Project> changed) throws ManipulationException {
         Path newPath = Path.of("pom-manipulation-ext.xml");
-        writeTemporaryPOMs(changed, originalFile -> pomResolver.andThen(temporaryPomFileProvider::deleteOnDispose)
-                                                               .apply(originalFile, newPath));
+        writeTemporaryPOMs(changed, originalFile -> pomResolver.apply(originalFile, newPath));
     }
 
     @PreDestroy
@@ -316,7 +324,7 @@ public class PomIO {
 
     /**
      * For any project listed as changed (tracked by GA in the session), write the modified model out to disk in a
-     * temporary place and atttach it to the model. Uses {@link ModelETL} to preserve as much formatting as possible.
+     * temporary place and attach it to the model. Uses {@link ModelETL} to preserve as much formatting as possible.
      *
      * @param changed the modified Projects to write out.
      * @param resolver the modified POM path resolver.
@@ -336,17 +344,17 @@ public class PomIO {
     }
 
     void temporaryPOMsrelocate(Project project, Function<File, File> withTemporaryPomFile) {
-        Arrays.stream(TemporayPOMsRelocator.INSTANCES)
+        Arrays.stream(TemporaryPOMsRelocator.INSTANCES)
               .forEach(relocator -> relocator.relocate(project, withTemporaryPomFile));
     }
 
-    interface TemporayPOMsRelocator {
+    interface TemporaryPOMsRelocator {
 
-        static TemporayPOMsRelocator[] INSTANCES = { new Modules(), new Parent() };
+        static TemporaryPOMsRelocator[] INSTANCES = { new Modules(), new Parent() };
 
         void relocate(Project project, Function<File, File> withTemporaryPomFile);
 
-        class Modules implements TemporayPOMsRelocator {
+        class Modules implements TemporaryPOMsRelocator {
 
             @Override
             public void relocate(Project project, Function<File, File> withTemporaryPomFile) {
@@ -382,14 +390,14 @@ public class PomIO {
 
         }
 
-        class Parent implements TemporayPOMsRelocator {
+        class Parent implements TemporaryPOMsRelocator {
 
             @Override
             public void relocate(Project project, Function<File, File> withTemporaryPomFile) {
                 Stream.of(project)
+                      .filter(Predicate.not(Project::isInheritanceRoot))
                       .map(Project::getModel)
                       .map(Model::getParent)
-                      .filter(Objects::nonNull)
                       .forEach(parent -> {
                           File basedir = project.getPom().getParentFile();
                           String relativePath = parent.getRelativePath();
@@ -400,6 +408,7 @@ public class PomIO {
                           File relativeFile = Paths.get(relativePath).toFile();
                           File manipulatedRelativeFile = withTemporaryPomFile.apply(relativeFile);
 
+                          parent.setVersion(project.getVersion()); // in a multi-module we have the same version
                           parent.setRelativePath(manipulatedRelativeFile.getPath());
                       });
             }
@@ -418,7 +427,7 @@ public class PomIO {
         writePOMs(changed, project -> project.getPom());
     }
 
-    protected void writePOMs(final Set<Project> changed, final Function<Project, File> outputFile)
+    public void writePOMs(final Set<Project> changed, final Function<Project, File> outputFile)
             throws ManipulationException {
         for (final Project project : changed) {
             if (logger.isDebugEnabled()) {
@@ -435,12 +444,6 @@ public class PomIO {
 
             model.setPomFile(pomFile);
         }
-//        try {
-//            new File(session.getTargetDir().getParentFile(), MARKER_FILE).createNewFile();
-//        } catch (IOException error) {
-//            logger.error("Unable to create marker file", error);
-//            throw new ManipulationException("Marker file creation failed", error);
-//        }
     }
 
     String buildManifestComment() {
@@ -454,12 +457,12 @@ public class PomIO {
      * @param target the file to write to.
      * @throws ManipulationException if an error occurs.
      */
-    public void writeModel(final Model model, final File target) throws ManipulationException {
-        try {
-            new MavenXpp3Writer().write(new FileWriter(target), model);
-        } catch (IOException e) {
-            throw new ManipulationException("Unable to write file", e);
-        }
+    public void writeModel(final Model model, final File target) throws IOException {
+        writeModel(model, new FileOutputStream(target));
+    }
+
+    public void writeModel(final Model model, final OutputStream output) throws IOException {
+        new MavenXpp3Writer().write(new OutputStreamWriter(output), model);
     }
 
     private void write(final Project project, final File pom, final Model model) throws ManipulationException {
@@ -523,18 +526,45 @@ public class PomIO {
         }
     }
 
-    private List<PomPeek> peekAtPomHierarchy(final File topPom) throws ManipulationException {
+    Provider<ExecutorService> writingPOMServiceProvider = () -> {
+        throw new IllegalStateException("writing pom executor service not provided");
+    };
+
+    @PostConstruct
+    public void initWritingPOMServiceProvider() {
+        BasicThreadFactory factory = new BasicThreadFactory.Builder().namingPattern("pom-manipulating-writer-%05d")
+                                                                     .daemon(true)
+                                                                     .priority(Thread.MAX_PRIORITY)
+                                                                     .build();
+        ExecutorService executor = Executors.newCachedThreadPool(factory);
+        writingPOMServiceProvider = () -> executor;
+    }
+
+    public Model readBackInMaven(Project project, CheckedFunction1<InputStream, Model> reader) throws IOException {
+        try (PipedOutputStream output = new PipedOutputStream();
+                PipedInputStream input = new PipedInputStream(output)) {
+            writingPOMServiceProvider.get().submit(() -> {
+                try (PipedOutputStream autoClosingOutput = output) {
+                    writeModel(project.getModel(), autoClosingOutput);
+                } catch (IOException e) {
+                    // Handle exception
+                }
+            });
+            return reader.unchecked().apply(input);
+        }
+    }
+
+    private List<PomPeek> peekAtPomHierarchy(final File execPom) throws ManipulationException {
         final List<PomPeek> peeked = new ArrayList<>();
 
         try {
             final LinkedList<File> pendingPoms = new LinkedList<>();
-            pendingPoms.add(topPom.getCanonicalFile());
-
-            final String topDir = topPom.getCanonicalFile().getParentFile().getCanonicalPath();
 
             final Set<File> seen = new HashSet<>();
 
-            File topLevelParent = topPom;
+            final Deque<Path> parentPaths = new LinkedList<>();
+
+            pendingPoms.add(execPom.getCanonicalFile());
 
             while (!pendingPoms.isEmpty()) {
                 final File pom = pendingPoms.removeFirst();
@@ -542,7 +572,7 @@ public class PomIO {
 
                 logger.debug("PEEK: {}", pom);
 
-                final PomPeek peek = new PomPeek(pom);
+                final PomPeek peek = new PomPeek(pom, !parentPaths.contains(pom.toPath()));
 
                 // Deprecated : we now default to scanning every XML file even templated
                 // ones but the if block provides a fallback if there are issues.
@@ -554,25 +584,30 @@ public class PomIO {
 
                     final File dir = pom.getParentFile();
 
-                    final String relPath = peek.getParentRelativePath();
-                    if (relPath != null) {
-                        logger.debug("Found parent relativePath: {} in pom: {}", relPath, pom);
-
-                        File parent = new File(dir, relPath);
-                        if (parent.isDirectory()) {
-                            parent = new File(parent, "pom.xml");
+                    final ProjectVersionRef parentKey = peek.getParentKey();
+                    if (parentKey != null) {
+                        String relPath = peek.getParentRelativePath();
+                        if (relPath == null) {
+                            relPath = "..";
                         }
+                        if (!relPath.isBlank()) {
+                            File parent = new File(dir, relPath);
+                            if (parent.isDirectory()) {
+                                parent = new File(parent, "pom.xml");
+                            }
 
-                        parent = parent.getCanonicalFile();
-                        if (parent.getParentFile().getCanonicalPath().startsWith(topDir) && parent.exists()
-                                && !seen.contains(parent) && !pendingPoms.contains(parent)) {
-                            topLevelParent = parent;
+                            parent = parent.getCanonicalFile();
+                            if (parent.exists()) {
+                                if (!seen.contains(parent) && !pendingPoms.contains(parent)) {
+                                    parentPaths.push(parent.toPath());
+                                    pendingPoms.add(parent);
 
-                            logger.debug("Possible top-level parent {}", parent);
-                            pendingPoms.add(parent);
-                        } else {
-                            logger.debug("Skipping reference to non-existent parent relativePath: '{}' in: {}", relPath,
-                                    pom);
+                                    logger.debug("Possible top-level parent {}", parent);
+                                }
+                            } else {
+                                logger.debug("Skipping reference to non-existent parent {} in {} pom file", parent,
+                                        pom);
+                            }
                         }
                     }
 
@@ -588,8 +623,10 @@ public class PomIO {
                                 modPom = new File(modPom, "pom.xml");
                             }
 
-                            if (modPom.exists() && !seen.contains(modPom) && !pendingPoms.contains(modPom)) {
-                                pendingPoms.addLast(modPom);
+                            if (modPom.exists()) {
+                                if (!seen.contains(modPom) && !pendingPoms.contains(modPom)) {
+                                    pendingPoms.addLast(modPom);
+                                }
                             } else {
                                 logger.debug("Skipping reference to non-existent module: '{}' in: {}", module, pom);
                             }
@@ -602,11 +639,12 @@ public class PomIO {
 
             final HashSet<ProjectVersionRef> projectrefs = new HashSet<>();
 
+            final Path topLevelPath = parentPaths.peek();
             for (final PomPeek p : peeked) {
                 if (p.getKey() != null) {
                     projectrefs.add(p.getKey());
                 }
-                if (p.getPom().equals(topLevelParent)) {
+                if (p.getPom().toPath().equals(topLevelPath)) {
                     logger.debug("Setting top level parent to {} :: {}", p.getPom(), p.getKey());
                     p.setInheritanceRoot(true);
                 }

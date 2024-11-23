@@ -15,6 +15,19 @@
  */
 package org.commonjava.maven.ext.core.util;
 
+import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertFalse;
+
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.DefaultMavenExecutionResult;
@@ -42,15 +55,7 @@ import org.junit.rules.TemporaryFolder;
 import org.slf4j.helpers.FormattingTuple;
 import org.slf4j.helpers.MessageFormatter;
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertTrue;
-import static org.junit.Assert.assertFalse;
+import io.vavr.CheckedFunction2;
 
 public class ProjectComparatorTest
 {
@@ -61,6 +66,8 @@ public class ProjectComparatorTest
 
     private final WildcardMap<ProjectVersionRef> map = new WildcardMap<>();
 
+    final CheckedFunction2<File,PomIO,Set<Project>> parseProject = PomIOTest.parseProject;
+   
     @Test
     public void testCompareNoChanges() throws Exception
     {
@@ -73,11 +80,11 @@ public class ProjectComparatorTest
                                           .getParentFile()
                                           .getParentFile(), "pom.xml" );
         PomIO pomIO = new PomIO();
-        List<Project> projectOriginal = pomIO.parseProject( projectroot );
-        List<Project> projectNew = pomIO.parseProject( projectroot );
+        Set<Project> originalProjects = parseProject.unchecked().apply(projectroot, pomIO);
+        Set<Project> modifiedProjects = parseProject.unchecked().apply(projectroot, pomIO);
 
         String result = ProjectComparator.compareProjects( session, new PME(), map,
-                                           projectOriginal, projectNew );
+                                           originalProjects, modifiedProjects );
 
         assertFalse( result.contains( "-->" ) );
     }
@@ -98,17 +105,17 @@ public class ProjectComparatorTest
                                                     .getParentFile(), "pom.xml" );
         PomIO pomIO = new PomIO();
 
-        List<Project> projectOriginal = pomIO.parseProject( projectroot );
-        List<Project> projectNew = pomIO.parseProject( projectroot );
+        Set<Project> originalProjects = parseProject.unchecked().apply(projectroot, pomIO);
+        Set<Project> modifiedProjects = parseProject.unchecked().apply(projectroot, pomIO);
 
-        projectNew.forEach( project -> project.getModel().setVersion( project.getVersion() + "-redhat-1" ) );
-        projectNew.forEach( project -> {
+        modifiedProjects.forEach( project -> project.getModel().setVersion( project.getVersion() + "-redhat-1" ) );
+        modifiedProjects.forEach( project -> {
             if ( project.getModel().getDependencyManagement() != null )
             {
                 project.getModel().getDependencyManagement().getDependencies().forEach( dependency -> dependency.setVersion( dependency.getVersion() + "-redhat-1" ) );
             }
         } );
-        projectNew.forEach( project -> project.getModel().getDependencies().forEach( dependency -> {
+        modifiedProjects.forEach( project -> project.getModel().getDependencies().forEach( dependency -> {
             if ( dependency.getGroupId().equals( "ch.qos.logback" ))
             {
                 dependency.setGroupId( "org.foobar.logback" );
@@ -118,7 +125,7 @@ public class ProjectComparatorTest
         PME json = new PME();
 
         String result = ProjectComparator.compareProjects( session, json, relocationState.getDependencyRelocations(),
-                                           projectOriginal, projectNew );
+                                           originalProjects, modifiedProjects );
         assertTrue( result.contains( "Managed dependencies :" ) );
         assertTrue( result.contains( "Project version :" ) );
         assertTrue( result.contains( "-redhat-1" ) );
@@ -149,11 +156,11 @@ public class ProjectComparatorTest
                                                     .getParentFile(), "pom.xml" );
         PomIO pomIO = new PomIO();
 
-        List<Project> projectOriginal = pomIO.parseProject( projectroot );
-        List<Project> projectNew = pomIO.parseProject( projectroot );
+        Set<Project> originalProjects = parseProject.unchecked().apply(projectroot, pomIO);
+        Set<Project> modifiedProjects = parseProject.unchecked().apply(projectroot, pomIO);
 
-        projectNew.forEach( project -> project.getModel().setVersion( project.getVersion() + "-redhat-1" ) );
-        projectNew.forEach( project -> {
+        modifiedProjects.forEach( project -> project.getModel().setVersion( project.getVersion() + "-redhat-1" ) );
+        modifiedProjects.forEach( project -> {
             if ( project.getModel().getDependencyManagement() != null )
             {
                 project.getModel().getDependencyManagement().getDependencies().forEach( dependency -> {
@@ -166,7 +173,7 @@ public class ProjectComparatorTest
         } );
 
         String result = ProjectComparator.compareProjects( session, new PME(), relocationState.getDependencyRelocations(),
-                                           projectOriginal, projectNew );
+                                           originalProjects, modifiedProjects );
 
         assertTrue( result.contains( "Managed dependencies :" ) );
         assertTrue( result.contains( "Project version :" ) );
@@ -197,17 +204,17 @@ public class ProjectComparatorTest
                                                     .getParentFile(), "pom.xml" );
         PomIO pomIO = new PomIO();
 
-        List<Project> projectOriginal = pomIO.parseProject( projectroot );
-        List<Project> projectNew = pomIO.parseProject( projectroot );
+        Set<Project> originalProjects = parseProject.unchecked().apply(projectroot, pomIO);
+        Set<Project> modifiedProjects = parseProject.unchecked().apply(projectroot, pomIO);
 
-        projectNew.forEach( project -> project.getModel().setVersion( project.getVersion() + "-redhat-1" ) );
-        projectNew.forEach( project -> {
+        modifiedProjects.forEach( project -> project.getModel().setVersion( project.getVersion() + "-redhat-1" ) );
+        modifiedProjects.forEach( project -> {
             if ( project.getModel().getDependencyManagement() != null )
             {
                 project.getModel().getDependencyManagement().getDependencies().forEach( dependency -> dependency.setVersion( dependency.getVersion() + "-redhat-1" ) );
             }
         } );
-        projectNew.forEach( project -> project.getModel().getDependencies().forEach( dependency -> {
+        modifiedProjects.forEach( project -> project.getModel().getDependencies().forEach( dependency -> {
             if ( dependency.getGroupId().equals( "ch.qos.logback" ))
             {
                 dependency.setGroupId( "org.foobar.logback" );
@@ -215,7 +222,7 @@ public class ProjectComparatorTest
         } ) );
 
         String result = ProjectComparator.compareProjects( session, new PME(), relocationState.getDependencyRelocations(),
-                                           projectOriginal, projectNew );
+                                           originalProjects, modifiedProjects );
         FileUtils.writeStringToFile( resultFile, result, StandardCharsets.UTF_8 );
 
         assertTrue( result.contains( "Managed dependencies :" ) );

@@ -108,7 +108,7 @@ public class ProjectComparator
     }
 
     public static String compareProjects( MavenSessionHandler session, PME jsonReport, WildcardMap<ProjectVersionRef> dependencyRelocations,
-                                          List<Project> originalProjects, List<Project> newProjects )
+                                          Set<Project> originalProjects, Set<Project> modifiedProjects )
                     throws ManipulationException
     {
         final boolean reportNonAligned = Boolean.parseBoolean( session.getUserProperties().getProperty( REPORT_NON_ALIGNED, "false") );
@@ -117,7 +117,7 @@ public class ProjectComparator
 
         try
         {
-            newProjects.forEach(
+            modifiedProjects.forEach(
                         newProject -> originalProjects.stream().
                                         filter( originalProject -> newProject.getArtifactId().equals( originalProject.getArtifactId() )
                                                                            && newProject.getGroupId().equals( originalProject.getGroupId() ) ).forEach( originalProject ->

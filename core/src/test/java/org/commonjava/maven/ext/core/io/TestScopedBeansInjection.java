@@ -5,8 +5,6 @@ import static org.junit.Assert.assertNotNull;
 import java.util.Collection;
 
 import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.context.SessionScoped;
-import javax.enterprise.util.TypeLiteral;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -20,7 +18,6 @@ import org.junit.runner.RunWith;
 @Named("pom-manipulation")
 public class TestScopedBeansInjection {
 
-    @Named("pom-manipulation")
     @Singleton
     @ApplicationScoped
     static class ApplicationScopedBean {

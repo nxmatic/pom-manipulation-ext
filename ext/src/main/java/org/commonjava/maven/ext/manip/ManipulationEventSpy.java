@@ -18,46 +18,61 @@ package org.commonjava.maven.ext.manip;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
-import org.apache.maven.eventspy.AbstractEventSpy;
+import org.apache.maven.eventspy.EventSpy;
 import org.apache.maven.execution.ExecutionEvent;
 import org.codehaus.plexus.PlexusContainer;
 import org.commonjava.maven.ext.core.ManipulationManager;
+import org.commonjava.maven.ext.core.ManipulationSession;
 
 import io.vavr.control.Try;
 
 /**
- * Implements hooks necessary to apply modifications in the Maven bootstrap, before the build starts.
+ * Implements hooks necessary to apply modifications in the Maven bootstrap,
+ * before the build starts.
  * 
  * @author jdcasey
  */
 @Named
 @Singleton
-public class ManipulatingEventSpy extends AbstractEventSpy {
+public class ManipulationEventSpy implements EventSpy {
 
     @Inject
-    // Collections are injected dynamically supporting the session scoped beans
-    private ManipulationManager manager;
+    ManipulationManager manager;
     
+    @Inject
+    ManipulationMultiModuleLifecycleParticipant lifeCycleParticipant;
+    
+    @Inject
+    Provider<ManipulationSession> sessionProvider;
+
     @Inject
     PlexusContainer container;
 
     boolean isEnabled = true;
-    
+
     @PostConstruct
-    public void init() {        
-        isEnabled = Try.success(ManipulatingEventSpy.class.getPackageName())
-                  .map(name -> name.concat(".ManipulatingLifeCycleParticipant"))
-                  .mapTry(container::hasComponent)
-                  .map(Boolean.FALSE::equals)
-                  .recover(__ -> Boolean.TRUE)
-                  .get()
-                  .booleanValue();
+    public void enableIfRequired() {
+        isEnabled = Try.success(ManipulationEventSpy.class.getPackageName())
+                .map(name -> name.concat(".ManipulationLifeCycleParticipant"))
+                .mapTry(name -> !container.hasComponent(name))
+                .map(Boolean::valueOf)
+                .recover(__ -> Boolean.FALSE)
+                .get()
+                .booleanValue();
     }
+    
+    @Override
+    public void init(Context context) throws Exception {}
+
+    @Override
+    public void close() throws Exception {}
 
     /**
-     * This is the entry point for the extension. This is called by Maven and we pass control to the
+     * This is the entry point for the extension. This is called by Maven and we
+     * pass control to the
      * ManipulationManager.
      */
     @Override
@@ -68,22 +83,20 @@ public class ManipulatingEventSpy extends AbstractEventSpy {
         if (!(event instanceof ExecutionEvent)) {
             return;
         }
-        
+
         final ExecutionEvent ee = (ExecutionEvent) event;
         final ExecutionEvent.Type type = ee.getType();
         switch (type) {
-        case ProjectDiscoveryStarted:
-            scanAndApply();
-            break;
-        case SessionEnded:
-            break;
-        default:
-            break;
+            case ProjectDiscoveryStarted:
+                lifeCycleParticipant.process(ee.getSession());
+                // manager.scanAndApply(sessionProvider.get());
+                break;
+            case SessionEnded:
+                break;
+            default:
+                break;
         }
     }
 
-    void scanAndApply() {
-            manager.scanAndApply();
-    }
 
 }

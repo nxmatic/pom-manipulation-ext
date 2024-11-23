@@ -15,6 +15,24 @@
  */
 package org.commonjava.maven.ext.core.impl;
 
+import static org.apache.commons.lang.StringUtils.isNotEmpty;
+import static org.commonjava.maven.ext.core.util.IdUtils.ga;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Provider;
+import javax.inject.Singleton;
+
 import org.apache.maven.model.Build;
 import org.apache.maven.model.BuildBase;
 import org.apache.maven.model.ConfigurationContainer;
@@ -40,22 +58,6 @@ import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static org.apache.commons.lang.StringUtils.isNotEmpty;
-import static org.commonjava.maven.ext.core.util.IdUtils.ga;
 
 /**
  * {@link Manipulator} implementation that looks for the deploy- and install-plugin &lt;skip/&gt; options, and enforces one of a couple scenarios:
@@ -99,14 +101,18 @@ public class DistributionEnforcingManipulator
 
     private final Logger logger = LoggerFactory.getLogger( getClass() );
 
-    private GalleyAPIWrapper galleyWrapper;
+    private Provider<GalleyAPIWrapper> galleyWrapperProvider;
 
     private ManipulationSession session;
 
     @Inject
-    public DistributionEnforcingManipulator(GalleyAPIWrapper galleyWrapper)
+    public DistributionEnforcingManipulator(Provider<GalleyAPIWrapper> provider)
     {
-        this.galleyWrapper = galleyWrapper;
+        galleyWrapperProvider = provider;
+    }
+    
+    protected GalleyAPIWrapper galleyWrapper() {
+        return galleyWrapperProvider.get();
     }
 
     /**
@@ -287,7 +293,7 @@ public class DistributionEnforcingManipulator
     private Xpp3Dom getConfigXml( final Node node )
         throws ManipulationException
     {
-        final String config = galleyWrapper.toXML( node.getOwnerDocument(), false )
+        final String config = galleyWrapper().toXML( node.getOwnerDocument(), false )
                                            .trim();
 
         try
@@ -357,7 +363,7 @@ public class DistributionEnforcingManipulator
         {
             try
             {
-                final Document doc = galleyWrapper.parseXml( entry.getValue() );
+                final Document doc = galleyWrapper().parseXml( entry.getValue() );
                 final NodeList children = doc.getDocumentElement()
                                              .getChildNodes();
                 if ( children != null )

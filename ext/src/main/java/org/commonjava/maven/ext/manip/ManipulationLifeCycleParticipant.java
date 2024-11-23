@@ -15,13 +15,12 @@
  */
 package org.commonjava.maven.ext.manip;
 
-import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Singleton;
 
 import org.apache.maven.AbstractMavenLifecycleParticipant;
 import org.apache.maven.MavenExecutionException;
+import org.apache.maven.SessionScoped;
 import org.apache.maven.execution.MavenSession;
 import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.ext.common.ManipulationException;
@@ -29,14 +28,13 @@ import org.commonjava.maven.ext.core.ManipulationSession;
 
 @Named(ManipulationComponent.HINT)
 @SessionScoped
-@Singleton
-public class ManipulatingLifeCycleParticipant
-    extends AbstractMavenLifecycleParticipant implements ManipulationComponent
+public class ManipulationLifeCycleParticipant
+    extends AbstractMavenLifecycleParticipant 
 {
     private ManipulationSession manipulatingSession;
 
     @Inject
-    public ManipulatingLifeCycleParticipant(ManipulationSession manipulatingSession)
+    public ManipulationLifeCycleParticipant(ManipulationSession manipulatingSession)
     {
         this.manipulatingSession = manipulatingSession;
     }

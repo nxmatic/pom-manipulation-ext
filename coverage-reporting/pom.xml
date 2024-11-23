@@ -44,10 +44,10 @@
       <groupId>org.commonjava.maven.ext</groupId>
       <artifactId>pom-manipulation-io</artifactId>
     </dependency>
-    <dependency>
+    <!--dependency>
       <groupId>org.commonjava.maven.ext</groupId>
       <artifactId>pom-manipulation-cli</artifactId>
-    </dependency>
+    </dependency-->
     <dependency>
       <groupId>org.commonjava.maven.ext</groupId>
       <artifactId>pom-manipulation-ext</artifactId>

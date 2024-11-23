@@ -17,6 +17,7 @@ package org.commonjava.maven.ext.common.session;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.settings.Settings;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.commonjava.maven.ext.common.ManipulationComponent;
 import org.commonjava.maven.ext.common.ManipulationException;
 
@@ -30,7 +31,7 @@ public interface MavenSessionHandler
 
     List<ArtifactRepository> getRemoteRepositories();
 
-    File getPom() throws ManipulationException;
+    File getPomFile() throws ManipulationException;
 
     File getTargetDir();
 
@@ -41,4 +42,6 @@ public interface MavenSessionHandler
     Settings getSettings();
 
     List<String> getExcludedScopes();
+    
+    <T> T lookup(Class<T> claxz) throws ComponentLookupException;
 }

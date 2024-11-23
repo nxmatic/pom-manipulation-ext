@@ -94,7 +94,7 @@ public abstract class BaseGroovyManipulator
      * @return a collection of parsed ArtifactRef.
      * @throws ManipulationException if an error occurs.
      */
-    List<File> parseGroovyScripts( final String value ) throws ManipulationException
+    List<File> resolveGroovyScripts( final String value ) throws ManipulationException
     {
         if ( isEmpty( value ) )
         {

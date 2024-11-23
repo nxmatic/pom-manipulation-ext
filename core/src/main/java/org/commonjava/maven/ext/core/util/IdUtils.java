@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,8 +55,8 @@ public final class IdUtils
     }
 
     /**
-     * Splits the value on ',', then wraps each value in {@link SimpleProjectVersionRef#parse(String)}. Returns null
-     * if the input value is null.
+     * Splits the value on ',', then wraps each value in {@link SimpleProjectVersionRef#parse(String)}. Returns am
+     * empty list if the input value is null.
      * @param value a comma separated list of GAV to parse
      * @return a collection of parsed ProjectVersionRef.
      */
@@ -63,7 +64,7 @@ public final class IdUtils
     {
         if ( isEmpty( value ) )
         {
-            return null;
+            return Collections.emptyList();
         }
         else
         {
