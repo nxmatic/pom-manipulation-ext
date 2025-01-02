@@ -28,6 +28,8 @@ limitations under the License.
   <artifactId>pom-manipulation-annotation</artifactId>
 
   <name>POM Manipulation Extension for Maven Annotation Processor</name>
+
+  <version>4.20-SNAPSHOT</version>
   <description>Contains config annotation and processor</description>
 
   <properties>
@@ -77,20 +79,6 @@ limitations under the License.
     <plugins>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <!--execution>
-              <id>default-jar</id>
-              <goals>
-              <goal>jar</goal>
-              </goals>
-              <configuration>
-              <excludes>
-              <exclude>**/ConfigValueProcessor*</exclude>
-              <exclude>META-INF/services/javax.annotation.processing.Processor</exclude>
-              </excludes>
-              </configuration>
-              </execution-->
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -183,7 +171,7 @@ limitations under the License.
               <groupId>com.google.auto.service</groupId>
               <artifactId>auto-service</artifactId>
               <version>${autoserviceVersion}</version>
-	      <classifier/>
+	      <classifier />
             </path>
           </annotationProcessorPaths>
           <!--compilerArgs>

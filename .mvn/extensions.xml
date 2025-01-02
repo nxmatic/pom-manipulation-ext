@@ -23,6 +23,27 @@
     <version>0.24-beta2</version>
   </extension>
   <extension>
+    <groupId>org.apache.maven.extensions</groupId>
+    <artifactId>maven-build-cache-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+  <extension>
+    <groupId>noname.maven.extensions.devenv</groupId>
+    <artifactId>maven-devenv-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+  <extension>
+    <groupId>org.apache.maven.extensions</groupId>
+    <artifactId>maven-external-version-extension</artifactId>
+    <version>0.0.0-dev</version>
+  </extension>
+<!--
+  <extension>
+    <groupId>org.commonjava.maven.ext</groupId>
+    <artifactId>pom-manipulation-ext</artifactId>
+    <version>4.19</version>
+  </extension>
+  <extension>
     <groupId>noname.maven.extensions.devenv</groupId>
     <artifactId>maven-devenv-extension</artifactId>
     <version>0.0.0-dev</version>
@@ -32,10 +53,6 @@
     <artifactId>maven-build-cache-extension</artifactId>
     <version>0.0.0-dev</version>
   </extension>
-  <extension>
-    <groupId>org.commonjava.maven.ext</groupId>
-    <artifactId>pom-manipulation-ext</artifactId>
-    <version>0.0.0-dev</version>
-  </extension>
-  <!-- 4.16 -->
+-->
+    <!--version>0.0.0-dev</version-->
 </extensions>

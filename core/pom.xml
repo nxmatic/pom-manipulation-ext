@@ -29,6 +29,8 @@
 
   <name>POM Manipulation Extension for Maven Core Library</name>
 
+  <version>4.20-SNAPSHOT</version>
+
   <dependencies>
     <dependency>
       <groupId>org.commonjava.maven.ext</groupId>
@@ -41,6 +43,11 @@
     <dependency>
       <groupId>org.commonjava.maven.ext</groupId>
       <artifactId>pom-manipulation-io</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.squareup</groupId>
+      <artifactId>javapoet</artifactId>
     </dependency>
 
     <dependency>
@@ -93,6 +100,11 @@
     <dependency>
       <groupId>org.commonjava.maven.galley</groupId>
       <artifactId>galley-maven</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.commonjava.maven.galley</groupId>
+      <artifactId>galley-cdi-embedder</artifactId>
     </dependency>
 
     <dependency>

@@ -28,14 +28,11 @@
   <artifactId>pom-manipulation-io</artifactId>
 
   <name>POM Manipulation Extension for Maven IO Library</name>
+
+  <version>4.20-SNAPSHOT</version>
   <description>Input/Output Library (POM File, Maven Repository and REST)</description>
 
   <dependencies>
-
-    <dependency>
-      <groupId>org.commonjava.maven.ext</groupId>
-      <artifactId>pom-manipulation-common</artifactId>
-    </dependency>
 
     <dependency>
       <groupId>commons-io</groupId>
@@ -200,6 +197,17 @@
     <dependency>
       <groupId>com.redhat.resilience.otel</groupId>
       <artifactId>opentelemetry-ext-cli-java</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.commonjava.maven.ext</groupId>
+      <artifactId>pom-manipulation-common</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>noname.maven.extensions.devenv</groupId>
+      <artifactId>maven-devenv-common</artifactId>
+      <classifier>api</classifier>
     </dependency>
 
     <dependency>

@@ -28,6 +28,9 @@
   <artifactId>pom-manipulation-common</artifactId>
 
   <name>POM Manipulation Extension for Maven Common Components</name>
+
+  <version>4.20-SNAPSHOT</version>
+
   <description>Common code shared amongst IO and Core</description>
 
   <dependencies>
@@ -121,6 +124,17 @@
       <groupId>org.jdom</groupId>
       <artifactId>jdom2</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.sisu</groupId>
+      <artifactId>org.eclipse.sisu.inject</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.sisu</groupId>
+      <artifactId>org.eclipse.sisu.plexus</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.codehaus.plexus</groupId>
       <artifactId>plexus-utils</artifactId>
